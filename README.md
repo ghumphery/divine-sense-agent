@@ -1,29 +1,29 @@
 # Divine Sense Agent
 
-## ⚠️ Clean-fork snapshot notes（本快照說明）
+**Divine Sense Agent 是一個跑在你自己電腦上的 AI 助理工作台。**
+它把 LLM（OpenRouter / Ollama / OpenAI 相容端點 / 本機 llama.cpp CPU 伺服器）
+接到 **20+ 組內建 MCP 工具面**，加上檔案沙盒、長期記憶、排程與背景任務——
+讓 AI 不只是聊天，而是能「實際動手做」，而且**資料全程留在你的機器上**。
 
-This repo is a **machine-clean snapshot** of the divine-sense-agent
-workspace (v0.9.133.18). Deliberately NOT included:
+## 它能做什麼（30 秒看懂）
 
-- `megaSpeedy/` — third-party broker SDK binaries + user data.
-  **`MEGA_STOCK_MODE=mock`（預設）完全不需要它**；live 券商下單請自行
-  安裝官方 megaspeedy 元件（見 CLAUDE.md v0.9.24/26 段）。
-- `backups/` — Qdrant snapshots contain ingested user documents.
-- 真實機敏值 — Telegram chat id 等已替換為 `<YOUR_TELEGRAM_CHAT_ID>`；
-  `.env` 與 `config/mcp.json` 從不入庫（請自 `.env.example` 與
-  `config/mcp.json.example` 複製並填入自己的值）。
+- 📚 **文件問答（RAG）** — 把整個資料夾的 PDF/EPUB/DOCX/PPTX/MD 一次
+  ingest 進本機 Qdrant，之後用自然語言問答，回答附**來源檔名引用**。
+- 🧰 **MCP 工具面** — 檔案沙盒與壓縮包原地編輯（zipfs）、Office 三件套
+  （wordcraft/gridcraft/deckcraft）、桌面自動化（windows-mcp）、網頁與
+  X.com 抓取（firefox_craw）、ONVIF 攝影機、Google Keep/Calendar、
+  股票（兆豐 mock-first）、憑證管理、日誌分析、圖片生成、筆記本、
+  技能檔案庫…（41 個 server、500+ 工具——Jev 依問題自動掛面）。
+- ⏳ **背景任務與排程** — 長任務自動轉背景（⏳ 面板＋Telegram 完成
+  通知）；cron／webhook 觸發；任務結論自動沉澱成可召回的長期記憶。
+- 🖥 **四種介面** — 桌面 GUI（pywebview）、手機 Web App（PWA＋HTTPS 遠端可用）、
+  CLI chat（BBS 風 REPL）、Telegram 雙向 bot。
+- 🧠 **記憶與自演化** — 長期記憶召回＋每日對話摘要自動沉澱（T+1）＋
+  E2E 驗證過的計畫技能編譯器（TACTI）＋可修訂的規則簿（rulebook）。
+- 🐕 **運算小狗** — 模型思考時，視窗底部有一隻小狗替你奔跑。
 
-第一行設定：`copy .env.example .env` → 填入 `OLLAMA_API_KEY` 或
-`OPENROUTER_API_KEY` → `qdrant-agent.bat ingest ./documents` →
-`divine-sense-agent-web.bat`。
+> 怎麼跑起來？直接跳下方 **## 快速開始**。
 
-
-Qdrant 版本的 `milvus-mcp-agent` — 把 Milvus Lite 換成 Qdrant（GPU 加速 HNSW + Vulkan SIMD）。
-
-> 📖 **使用者操作手冊**（全功能總覽）：[`USER_MANUAL.md`](USER_MANUAL.md)
-> 📘 **內部設計 / 維護手冊**：見 [`ARCHITECTURE.md`](ARCHITECTURE.md)
-> （資料流、cache 拓樸、加新功能的 SOP、除錯 checklist、與 sibling 同步策略）。
-> 本 README 講「怎麼用」，ARCHITECTURE.md 講「為什麼這樣寫」。
 
 ## 為什麼換 Qdrant？
 
@@ -31,6 +31,7 @@ Qdrant 版本的 `milvus-mcp-agent` — 把 Milvus Lite 換成 Qdrant（GPU 加�
 - **Milvus Lite 鎖問題**：file lock 拒絕多 process 同時存取，無法並行 ingest + query
 - **Qdrant 是真 server**：HTTP API，HNSW 預設 SIMD 加速（Linux 原生 / Vulkan / GPU），多 client 可並行
 - **API 更乾淨**：沒有 IVF_FLAT vs HNSW 抉擇；HNSW 是預設且在 10K-1M 規模都好用
+
 
 ## 快速開始
 
@@ -688,6 +689,7 @@ python cli.py stats   # 確認 collection_dim=768 == native_dim=768
 - 沒有 IVF_FLAT / nlist 參數；HNSW 是預設
 - 沒有 file lock 議題（Qdrant 是 HTTP server）— 所以 chat REPL 不需要 `--mcp` subprocess 架構，直接走 in-process Retriever
 
+
 ## 詳細文件與歷史
 - `docs/chat_flow.md` — Chat 問題處理流程**詳細版**（從 README 拆出的 1,700 行逐段流程、降級規則、工具對照）
 - `CHANGELOG.md` — **版本異動**與歷史記錄（v0.2.0 起、最新在前；README 只保留現況，異動不再塞在這裡）
@@ -699,4 +701,32 @@ python cli.py stats   # 確認 collection_dim=768 == native_dim=768
 - [ ] Streamlit Web UI
 - [ ] Dockerfile + CI
 - [ ] Performance benchmark vs Milvus Lite
+
+
+---
+
+## ⚠️ Clean-fork snapshot notes（本快照說明）
+
+This repo is a **machine-clean snapshot** of the divine-sense-agent
+workspace (v0.9.133.18). Deliberately NOT included:
+
+- `megaSpeedy/` — third-party broker SDK binaries + user data.
+  **`MEGA_STOCK_MODE=mock`（預設）完全不需要它**；live 券商下單請自行
+  安裝官方 megaspeedy 元件（見 CLAUDE.md v0.9.24/26 段）。
+- `backups/` — Qdrant snapshots contain ingested user documents.
+- 真實機敏值 — Telegram chat id 等已替換為 `<YOUR_TELEGRAM_CHAT_ID>`；
+  `.env` 與 `config/mcp.json` 從不入庫（請自 `.env.example` 與
+  `config/mcp.json.example` 複製並填入自己的值）。
+
+第一行設定：`copy .env.example .env` → 填入 `OLLAMA_API_KEY` 或
+`OPENROUTER_API_KEY` → `qdrant-agent.bat ingest ./documents` →
+`divine-sense-agent-web.bat`。
+
+
+Qdrant 版本的 `milvus-mcp-agent` — 把 Milvus Lite 換成 Qdrant（GPU 加速 HNSW + Vulkan SIMD）。
+
+> 📖 **使用者操作手冊**（全功能總覽）：[`USER_MANUAL.md`](USER_MANUAL.md)
+> 📘 **內部設計 / 維護手冊**：見 [`ARCHITECTURE.md`](ARCHITECTURE.md)
+> （資料流、cache 拓樸、加新功能的 SOP、除錯 checklist、與 sibling 同步策略）。
+> 本 README 講「怎麼用」，ARCHITECTURE.md 講「為什麼這樣寫」。
 
