@@ -1,5 +1,54 @@
 # Divine Sense Agent
 
+🌐 **English** · [繁體中文](#繁體中文) · [日本語](#日本語)
+
+## English
+
+An **AI agent workbench that runs on your own machine**. It wires an
+LLM (OpenRouter / Ollama / OpenAI-compatible endpoints / a local
+llama.cpp CPU server) into **20+ built-in MCP tool surfaces**, plus
+file sandboxes, long-term memory, scheduling and background tasks —
+so the AI doesn't just chat, it **actually gets things done**, while
+your data never leaves your machine.
+
+What it can do, in 30 seconds:
+
+- 📚 **Document Q&A (RAG)** — bulk-ingest PDF/EPUB/DOCX/PPTX/MD into
+  a local Qdrant store, then ask in natural language with **source
+  filename citations**.
+- 🧰 **MCP tool surface** — in-archive editing (zipfs), Office suite
+  (wordcraft/gridcraft/deckcraft), desktop automation (windows-mcp),
+  web & X.com scraping (firefox_craw), ONVIF cameras, Google
+  Keep/Calendar, stocks (Mega, mock-first), credentials, log analysis,
+  image generation, notebook, a skill library… (41 servers, 500+
+  tools; Jev auto-mounts the right subset per question).
+- ⏳ **Background tasks & scheduling** — long runs auto-detach
+  (⏳ panel + Telegram completion notice); cron/webhook triggers; task
+  conclusions sink back into recallable long-term memory.
+- 🖥 **Four interfaces** — desktop GUI (pywebview), mobile web app
+  (PWA + HTTPS, reachable remotely), CLI chat (BBS-style REPL),
+  two-way Telegram bot.
+- 🧠 **Memory & self-evolution** — long-term recall + daily automatic
+  chat-summary consolidation (T+1) + an end-to-end verified plan
+  compiler (TACTI) + a revisable rulebook.
+- 🐕 **The computing dog** — while the model thinks, a puppy runs
+  across the bottom of the window.
+
+Quick start (detailed prerequisites below):
+
+```bat
+copy .env.example .env    rem put an API key in
+qdrant-agent.bat ingest .\documents
+divine-sense-agent-web.bat
+```
+
+The detailed usage sections further down are written in Traditional
+Chinese; the file names, commands and tool names stay as-is.
+
+---
+
+## 繁體中文
+
 **Divine Sense Agent 是一個跑在你自己電腦上的 AI 助理工作台。**
 它把 LLM（OpenRouter / Ollama / OpenAI 相容端點 / 本機 llama.cpp CPU 伺服器）
 接到 **20+ 組內建 MCP 工具面**，加上檔案沙盒、長期記憶、排程與背景任務——
@@ -25,13 +74,51 @@
 > 怎麼跑起來？直接跳下方 **## 快速開始**。
 
 
-## 為什麼換 Qdrant？
 
-- **Milvus Lite 太慢**：每次 search 都要 cold-start IVF_FLAT segments；100K+ chunks 上 3-5 sec/查詢
-- **Milvus Lite 鎖問題**：file lock 拒絕多 process 同時存取，無法並行 ingest + query
-- **Qdrant 是真 server**：HTTP API，HNSW 預設 SIMD 加速（Linux 原生 / Vulkan / GPU），多 client 可並行
-- **API 更乾淨**：沒有 IVF_FLAT vs HNSW 抉擇；HNSW 是預設且在 10K-1M 規模都好用
+---
 
+## 日本語
+
+**自分のマシン上で動く AI エージェント・ワークベンチ。**
+LLM（OpenRouter / Ollama / OpenAI 互換エンドポイント / ローカルの
+llama.cpp CPU サーバー）を **20+ の内蔵 MCP ツール面**に接続し、
+ファイルサンドボックス・長期記憶・スケジューリング・バックグラウンド
+タスクと組み合わせます。AI はただ会話するだけでなく、**実際に手を動かし**、
+データは**あなたのマシンから出ません**。
+
+30 秒で分かること：
+
+- 📚 **文書 Q&A（RAG）** — PDF/EPUB/DOCX/PPTX/MD をローカル Qdrant に
+  一括 ingest し、自然言語で質問。回答には**出典ファイル名**を付記。
+- 🧰 **MCP ツール面** — アーカイブ内直接編集（zipfs）、Office 三種
+  （wordcraft/gridcraft/deckcraft）、デスクトップ自動化（windows-mcp）、
+  Web・X.com 取得（firefox_craw）、ONVIF カメラ、Google Keep/カレンダー、
+  株（メガ証券・mock-first）、認証情報管理、ログ分析、画像生成、
+  ノート、スキルライブラリ…（41 サーバー／500+ ツール。Jev が質問に応じて
+  自動マウント）。
+- ⏳ **バックグラウンドタスク＆スケジュール** — 長時間タスクは自動で
+  背景へ（⏳ パネル＋Telegram 完了通知）。cron／webhook 起動。タスクの
+  結論は呼び出し可能な長期記憶へ自動沈殿。
+- 🖥 **4 つの画面** — デスクトップ GUI（pywebview）、モバイル Web
+  アプリ（PWA＋HTTPS 遠隔可）、CLI チャット（BBS 風 REPL）、
+  双方向 Telegram bot。
+- 🧠 **記憶と自己進化** — 長期記憶リコール＋毎日の会話要約自動沈殿
+  （T+1）＋E2E 検証済みプランコンパイラ（TACTI）＋改訂可能なルール
+  ブック。
+- 🐕 **計算犬** — モデルが考えている間、画面の下で子犬が走ります。
+
+クイックスタート（詳細な前提条件は下記参照）：
+
+```bat
+copy .env.example .env    rem API キーを記入
+qdrant-agent.bat ingest .\documents
+divine-sense-agent-web.bat
+```
+
+以下の詳細な使用説明は繁体字中国語で書かれています（ファイル名・
+コマンド・ツール名はそのまま表示されています）。
+
+---
 
 ## 快速開始
 
@@ -258,7 +345,7 @@ build-gui.bat
 backend / dim / LRU 用量 / disk 條數 + hit ratio。點 🧹 Clear
 可一鍵清掉兩層快取(會有 confirm 對話框防誤觸)。
 
-## CLI 對照（與 milvus-mcp-agent 相同）
+## CLI 對照
 
 | 命令 | 用途 |
 |---|---|
@@ -671,36 +758,20 @@ python cli.py stats   # 確認 collection_dim=768 == native_dim=768
   會自動 pad/truncate 進到 collection dim，但 native 語意不一定
   能完整存下來。
 
-## 與 milvus-mcp-agent 的關係
-
-本專案是 milvus-mcp-agent（v0.1.19.4）的 sibling 專案。Vector store 換成 Qdrant，
-**其餘架構（5 個 MCP tools、CLI 子命令、`.env` 規範、開發紀律）保持不變**。
-
-共用資源：
-- Loader（多格式解析）
-- Chunker（RecursiveCharacterTextSplitter）
-- Embedder（OpenAI + hash fallback）
-- Agent（CITATION RULES、Ollama/OpenAI provider 自動切換）
-- UI md_render（ANSI-aware BBS-style）
-- BBS chat REPL + Session 管理（v0.2.0 ported）
-
-差異點：
-- `src/vector_store/qdrant_client.py`（取代 milvus_client.py）
-- 沒有 IVF_FLAT / nlist 參數；HNSW 是預設
-- 沒有 file lock 議題（Qdrant 是 HTTP server）— 所以 chat REPL 不需要 `--mcp` subprocess 架構，直接走 in-process Retriever
-
-
 ## 詳細文件與歷史
 - `docs/chat_flow.md` — Chat 問題處理流程**詳細版**（從 README 拆出的 1,700 行逐段流程、降級規則、工具對照）
 - `CHANGELOG.md` — **版本異動**與歷史記錄（v0.2.0 起、最新在前；README 只保留現況，異動不再塞在這裡）
 - `USER_MANUAL.md` — 功能使用者手冊；`ARCHITECTURE.md` — 模組/資料流；`SKILL_GUIDE.md` — 技能檔案庫；`.clinerules/CLAUDE.md` — 開發紀律與版本演進
 
+
 ## TODO
 
-- [ ] `cli.py ask --stream`：qdrant `Agent` 還沒有 `ask_stream()`（目前 `--stream` 會 `AttributeError`，需 port streaming from milvus）
+- [ ] `cli.py ask --stream`：qdrant `Agent` 還沒有 `ask_stream()`（目前 `--stream` 會 `AttributeError`，）
 - [ ] Streamlit Web UI
 - [ ] Dockerfile + CI
-- [ ] Performance benchmark vs Milvus Lite
+
+
+---
 
 
 ---
@@ -723,7 +794,6 @@ workspace (v0.9.133.18). Deliberately NOT included:
 `divine-sense-agent-web.bat`。
 
 
-Qdrant 版本的 `milvus-mcp-agent` — 把 Milvus Lite 換成 Qdrant（GPU 加速 HNSW + Vulkan SIMD）。
 
 > 📖 **使用者操作手冊**（全功能總覽）：[`USER_MANUAL.md`](USER_MANUAL.md)
 > 📘 **內部設計 / 維護手冊**：見 [`ARCHITECTURE.md`](ARCHITECTURE.md)

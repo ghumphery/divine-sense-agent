@@ -1,0 +1,4 @@
+docs: drop milvus mentions and the trilingual README intro
+
+- README: remove the 'why Qdrant' history section, the 'milvus-mcp-agent relation' section and other leftover mentions — the project stands on its own now (history stays in CHANGELOG.md)
+- README: language-switch links + full intro sections in English / Traditional Chinese / Japanese (EN and JA translated; detailed usage sections below stay zh-TW)
