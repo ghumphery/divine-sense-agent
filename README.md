@@ -1,5 +1,23 @@
 # Divine Sense Agent
 
+## ⚠️ Clean-fork snapshot notes（本快照說明）
+
+This repo is a **machine-clean snapshot** of the divine-sense-agent
+workspace (v0.9.133.18). Deliberately NOT included:
+
+- `megaSpeedy/` — third-party broker SDK binaries + user data.
+  **`MEGA_STOCK_MODE=mock`（預設）完全不需要它**；live 券商下單請自行
+  安裝官方 megaspeedy 元件（見 CLAUDE.md v0.9.24/26 段）。
+- `backups/` — Qdrant snapshots contain ingested user documents.
+- 真實機敏值 — Telegram chat id 等已替換為 `<YOUR_TELEGRAM_CHAT_ID>`；
+  `.env` 與 `config/mcp.json` 從不入庫（請自 `.env.example` 與
+  `config/mcp.json.example` 複製並填入自己的值）。
+
+第一行設定：`copy .env.example .env` → 填入 `OLLAMA_API_KEY` 或
+`OPENROUTER_API_KEY` → `qdrant-agent.bat ingest ./documents` →
+`divine-sense-agent-web.bat`。
+
+
 Qdrant 版本的 `milvus-mcp-agent` — 把 Milvus Lite 換成 Qdrant（GPU 加速 HNSW + Vulkan SIMD）。
 
 > 📖 **使用者操作手冊**（全功能總覽）：[`USER_MANUAL.md`](USER_MANUAL.md)
