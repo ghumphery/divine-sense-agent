@@ -1,0 +1,2 @@
+rootProject.name = "divine-sense-agent"
+include ':app'

@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="auto">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <!-- v0.9.15.2+ — mobile web format: without the viewport meta,
+       phone browsers render the app at a virtual 980px desktop width
+       and zoom out. width=device-width + initial-scale=1 gives the
+       real CSS-pixel layout that the responsive rules in style.css
+       (max-width: 820px / 480px) key off. Shared with the pywebview
+       GUI, which is unaffected (desktop WebView ignores viewport).
+       v0.9.126.6 — user-scalable=no + scale caps: the web app must not
+       be zoomable (pinch / double-tap). iOS Safari ignores
+       user-scalable=no for pinch, so app.js adds a gesture/ctrl-wheel
+       guard (bindZoomGuard) as the second layer. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1a1b1e" media="(prefers-color-scheme: dark)" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Divine Sense Agent</title>
+  <!-- v0.9.127.4 — project icon: the Divine Sense puppy (rebuilt from
+       the user-provided dog_icon.png; full-color raster wrapped inside
+       icon.svg + multi-size ico. v0.9.103.3 built the first dog from
+       dog_icon_bw.svg). -->
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="icon" type="image/x-icon" href="icon.ico" sizes="any" />
+  <link rel="stylesheet" href="style.css" />
+  <!--
+    Markdown rendering pipeline (v0.8.3+):
+      local vendor first → CDN fallback → console warning if both fail.
+    We prefer the vendored copies under gui/assets/vendor/ (pinned to
+    the exact same versions as the CDN URLs) because some users run
+    the GUI offline, behind a corp firewall, or with a flaky DNS to
+    jsdelivr. CDN is kept as a fallback path for environments where
+    vendor files are missing (e.g. third-party redistribution).
+  -->
+  <script defer src="vendor/marked.min.js"
+          onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js'"></script>
+  <script defer src="vendor/purify.min.js"
+          onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.min.js'"></script>
+  <script defer src="app.js"></script>
+  <!-- v0.9.125.9 — PWA installability: Android Firefox/Chrome can
+       "install" this app; the installed launch runs STANDALONE (no
+       browser banner eating the layout). -->
+  <link rel="manifest" href="manifest.webmanifest" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <!-- v0.9.103.4 — the brain emoji logo replaced by the Divine Sense
+           puppy icon (gui/assets/icon.svg; rebuilt in v0.9.127.4 from
+           the user-provided dog_icon.png). -->
+      <span class="logo"><img class="logo-img" src="icon.svg" alt="" /></span>
+      <span class="title" data-i18n="appTitle">Divine Sense Agent</span>
+      <span class="version" id="app-version"></span>
+    </div>
+    <div class="header-right">
+      <label class="lang-picker">
+        🌐
+        <select id="lang-select" aria-label="UI language">
+          <option value="zh-TW">繁體中文</option>
+          <option value="zh-CN">简体中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </label>
+      <label class="lang-picker theme-picker" data-i18n-title="themeLabel" title="Theme">
+        🎨
+        <select id="theme-select" aria-label="Theme">
+          <option value="auto" data-i18n="themeAuto">🌗 自動（跟隨系統）</option>
+          <option value="light" data-i18n="themeLight">☀️ 淺色</option>
+          <option value="dark" data-i18n="themeDark">🌙 深色</option>
+        </select>
+      </label>
+      <button id="appearance-btn" class="btn" data-i18n-title="appearanceBtn" title="Appearance">🖌️</button>
+    </div>
+  </header>
+
+  <!-- v0.9.99.8 — tabs moved to sit directly under the brand topbar,
+       above the content area (user request); the stray duplicated
+       content container that used to wrap the admin panels is gone. -->
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="chat"     role="tab" data-i18n="tabChat">💬 Chat</button>
+    <button class="tab"        data-tab="ingest"   role="tab" data-i18n="tabIngest">📥 Ingest</button>
+    <button class="tab"        data-tab="search"   role="tab" data-i18n="tabSearch">🔍 Search</button>
+    <button class="tab"        data-tab="admin"    role="tab" data-i18n="tabAdmin">🛠 系統管理</button>
+    <button class="tab"        data-tab="stats"    role="tab" data-i18n="tabStats">📊 Stats</button>
+    <button class="tab"        data-tab="sessions" role="tab" data-i18n="tabSessions">🗂 Sessions</button>
+    <button class="tab"        data-tab="schedules" role="tab" data-i18n="tabSchedules">⏰ Schedules</button>
+    <button class="tab"        data-tab="notes"     role="tab" data-i18n="tabNotes">📝 Notes</button>
+    <button class="tab"        data-tab="creds"     role="tab" data-i18n="tabCreds">🔑 Credentials</button>
+  </nav>
+
+  <!-- ── Appearance dialog（v0.9.99.0 — 背景圖 / 自選色調 / 字型） ── -->
+  <div class="modal" id="appearance-dialog" hidden>
+    <div class="modal-content appearance-dialog">
+      <div class="modal-header">
+        <h3 data-i18n="appearanceTitle">🎨 外觀設定</h3>
+        <button id="appearance-close" class="btn" data-i18n="notesCancel">✖</button>
+      </div>
+      <div class="modal-body appearance-body">
+        <h4 data-i18n="appearanceBg">🖼️ 背景圖</h4>
+        <div class="ap-row">
+          <input type="file" id="ap-bg-file" accept="image/*" class="ap-grow">
+        </div>
+        <div class="ap-row">
+          <input type="text" id="ap-bg-url" class="ap-grow"
+                 data-i18n-ph="appearanceBgUrl" placeholder="或貼上圖片 URL…">
+          <button id="ap-bg-url-apply" class="btn" data-i18n="appearanceApply">套用</button>
+        </div>
+        <div class="ap-row">
+          <label data-i18n="appearanceBgDim">暗化</label>
+          <input type="range" id="ap-bg-dim" min="0" max="80" value="0">
+          <span id="ap-bg-dim-val">0%</span>
+          <button id="ap-bg-clear" class="btn" data-i18n="appearanceBgClear">清除背景圖</button>
+        </div>
+        <div class="ap-row">
+          <label data-i18n="appearanceBgFit">佈放格式</label>
+          <select id="ap-bg-fit">
+            <option value="cover" data-i18n="appearanceBgFitCover">滿格縮放（cover）</option>
+            <option value="contain" data-i18n="appearanceBgFitContain">完整顯示（contain）</option>
+            <option value="center" data-i18n="appearanceBgFitCenter">原尺置中（center）</option>
+            <option value="tile" data-i18n="appearanceBgFitTile">重複平鋪（tile）</option>
+          </select>
+        </div>
+
+        <h4 data-i18n="appearanceAccent">🎨 自選色調</h4>
+        <div class="ap-row">
+          <input type="color" id="ap-accent" value="#2563eb">
+          <div class="ap-swatches">
+            <button class="ap-swatch" data-color="#2563eb" title="Blue"></button>
+            <button class="ap-swatch" data-color="#059669" title="Green"></button>
+            <button class="ap-swatch" data-color="#7c3aed" title="Violet"></button>
+            <button class="ap-swatch" data-color="#d97706" title="Amber"></button>
+            <button class="ap-swatch" data-color="#dc2626" title="Red"></button>
+            <button class="ap-swatch" data-color="#0ea5e9" title="Cyan"></button>
+          </div>
+          <button id="ap-accent-reset" class="btn" data-i18n="appearanceAccentReset">重設</button>
+        </div>
+
+        <h4 data-i18n="appearanceFont">🔤 字型</h4>
+        <div class="ap-row">
+          <select id="ap-font" class="ap-grow">
+            <option value="" data-i18n="appearanceFontSystem">系統預設</option>
+            <option value='"Microsoft JhengHei", "Noto Sans CJK TC", sans-serif'>微軟正黑體</option>
+            <option value='"Noto Sans TC", "Noto Sans CJK TC", sans-serif'>Noto Sans</option>
+            <option value='"DFKai-SB", "BiauKai", serif'>標楷體</option>
+            <option value='"Microsoft JhengHei UI", "Segoe UI", sans-serif'>Segoe UI / 正黑 UI</option>
+            <option value='Georgia, "Times New Roman", "Noto Serif TC", serif'>襯線（Serif）</option>
+            <option value='"Comic Sans MS", "Segoe UI", sans-serif'>Comic Sans</option>
+          </select>
+        </div>
+        <div class="ap-row">
+          <input type="text" id="ap-font-custom" class="ap-grow"
+                 data-i18n-ph="appearanceFontCustom" placeholder='自訂字型 CSS（例："BLogger", serif）'>
+        </div>
+        <div class="ap-row">
+          <label data-i18n="appearanceFontSize">字級</label>
+          <select id="ap-font-size">
+            <option value="" data-i18n="appearanceFontStd">標準</option>
+            <option value="13px" data-i18n="appearanceFontSmall">小</option>
+            <option value="15px" data-i18n="appearanceFontLarge">大</option>
+            <option value="17px" data-i18n="appearanceFontXL">特大</option>
+          </select>
+          <label data-i18n="appearanceMono">程式碼字型</label>
+          <input type="text" id="ap-mono" class="ap-grow"
+                 placeholder='Cascadia Code, Consolas, monospace'>
+        </div>
+        <div class="ap-row ap-actions">
+          <button id="ap-reset" class="btn danger" data-i18n="appearanceReset">全部重設</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Boot splash overlay (v0.8.7+) ── -->
+
+  <main class="content">
+
+    <!-- ── Chat tab ── -->
+    <section class="panel active" id="panel-chat" role="tabpanel">
+      <div class="chat-toolbar">
+        <button id="chat-new" class="btn" data-i18n="newSession">+ New session</button>
+        <select id="chat-session-picker" aria-label="Load session"></select>
+        <!-- v0.9.133.8 — rename THE CURRENT chat session right from the
+             chat tab (reuses update_session_title + the active-session
+             lockstep; no id yet = saveSession() first). -->
+        <button id="chat-rename" class="btn">✏️ <span data-i18n="sessRename">改標題</span></button>
+        <!-- v0.9.47.0+ — background execution: when checked, the next
+             sent message is submitted as a background task (returns
+             task_id immediately; the turn runs with the full tool
+             surface and lands in session task-<id>). -->
+        <label class="chk">
+          <input type="checkbox" id="chat-bg-toggle" />
+          <span data-i18n="bgRun">Background</span>
+        </label>
+        <button id="chat-save" class="btn" data-i18n="save">💾 Save</button>
+        <button id="chat-clear" class="btn btn-warn" data-i18n="clear">🗑 Clear</button>
+        <button id="chat-tools-btn" class="btn" data-i18n="chatTools">🧰 Tools</button>
+        <!-- v0.9.47.0+ — background task panel: running + recent
+             background LLM turns across ALL sources (manual submit /
+             scheduler / webhook / telegram). The badge paints from
+             get_status's running_tasks on every 30 s poll. -->
+        <button id="chat-tasks-btn" class="btn" data-i18n="chatTasks">⏳ Tasks</button>
+        <!-- v0.9.16.0+ — web-mode client upload: hidden inputs + buttons.
+             📎 accepts ANY file; 📷 is the phone media picker (accept
+             image/video — camera roll / gallery on mobile web), hidden
+             on desktop widths by style.css. app.js hides both entirely
+             in pywebview GUI mode, where create_file_dialog already
+             covers same-machine picking. -->
+        <input type="file" id="chat-upload-input" multiple hidden />
+        <input type="file" id="chat-media-input" accept="image/*,video/*" multiple hidden />
+        <button id="chat-upload-btn" class="btn" title="Upload files">📎</button>
+        <button id="chat-media-btn" class="btn" title="Upload photo / video">📷</button>
+        <!-- v0.9.68.0+ — chat voice-IN: click to start/stop a mic
+             recording; on stop the blob is base64'd and sent through
+             api.voice_stt → the transcript is inserted into the chat
+             input. Enabled in BOTH web and pywebview GUI mode (the
+             mic needs localhost/HTTPS + permission; failures toast
+             the reason). -->
+        <button id="chat-mic-btn" class="btn" data-i18n="voiceMic">🎤</button>
+        <!-- v0.9.127.11 — auto-TTS toggle (🔊 replies spoken as they
+             land) + hands-free voice loop (🎧 listen → auto-send →
+             spoken reply → listen again; browser TTS fallback). Both
+             are persisted in localStorage; active state paints green
+             (.btn-loop-on). Tooltips carry the i18n meaning since the
+             button faces are icon-only. -->
+        <button id="chat-autotts-btn" class="btn" data-i18n-title="autoTtsOff">🔊</button>
+        <button id="chat-loop-btn" class="btn" data-i18n-title="voiceLoopOff">🎧</button>
+        <!-- v0.9.100.0 — quick phrases: user-defined snippets/commands
+             inserted into the chat input with one click (panel with
+             add / delete; persisted in localStorage). -->
+        <button id="chat-snips-btn" class="btn" data-i18n="snipsBtn" title="Snippets">⚡</button>
+        <!-- v0.9.132.9 — clipboard buttons for the chat input: copy the
+             draft out / paste clipboard text in (mobile keyboards and
+             remote-desktop sessions make text selection awkward). -->
+        <button id="chat-clip-copy" class="btn" data-i18n-title="clipCopyInput" title="Copy">📋</button>
+        <button id="chat-clip-paste" class="btn" data-i18n-title="clipPasteInput" title="Paste">📥</button>
+        <!-- v0.9.133.0 — bubble style (歷史氣泡顏色/透明度): per-role
+             colour + opacity sliders, persisted in localStorage. -->
+        <button id="chat-style-btn" class="btn" data-i18n="styleBtn" title="Bubble style">🎨</button>
+      </div>
+      <!-- v0.9.14.0+ — per-request MCP tool picker: the DISABLED set
+           persists in localStorage ('chat-disabled-tools'); an empty
+           selection = everything enabled (the .env gate applies). -->
+      <div id="chat-tools-panel" hidden>
+        <div class="chat-tools-head">
+          <span id="chat-tools-count"></span>
+          <button id="chat-tools-all" class="btn" data-i18n="chatToolsAll">All on</button>
+          <button id="chat-tools-none" class="btn" data-i18n="chatToolsNone">All off</button>
+          <button id="chat-tools-reset" class="btn" data-i18n="chatToolsReset">Reset</button>
+        </div>
+        <div id="chat-tools-list"></div>
+      </div>
+      <!-- v0.9.133.0 — bubble style (歷史氣泡顏色/透明度): colour +
+           opacity per role, live-applied via CSS vars on #chat-log and
+           persisted in localStorage ('chat-bubble-style'). -->
+      <div id="chat-style-panel" hidden>
+        <div class="chat-style-row">
+          <span data-i18n="styleAsst">Assistant bubble</span>
+          <input type="color" id="bub-asst-color" value="#26272e" />
+          <input type="range" id="bub-asst-alpha" min="30" max="100" step="5" value="100" />
+        </div>
+        <div class="chat-style-row">
+          <span data-i18n="styleUser">User bubble</span>
+          <input type="color" id="bub-user-color" value="#2f62d4" />
+          <input type="range" id="bub-user-alpha" min="30" max="100" step="5" value="100" />
+        </div>
+        <div class="chat-style-foot">
+          <button id="chat-style-reset" class="btn" data-i18n="styleReset">Reset</button>
+        </div>
+      </div>
+      <!-- v0.9.47.0+ — background task panel: running + recent
+           background LLM turns (auto-refreshes every 2 s while open). -->
+      <div id="chat-tasks-panel" hidden>
+        <div class="chat-tools-head">
+          <span id="chat-tasks-count"></span>
+          <button id="chat-tasks-refresh" class="btn" data-i18n="taskRefresh">Refresh</button>
+        </div>
+        <div id="chat-tasks-list"></div>
+      </div>
+      <div id="chat-log" class="chat-log" aria-live="polite"></div>
+      <!-- v0.9.101.0 — quick-phrases panel: GLOBAL store (all devices
+           share $QDRANT_RAG_HOME/snippets.json via Api snippets_get/
+           snippets_save — no per-device rebuilding); the ➕ add row is
+           hideable (管理 toggle); when the panel opens the chat log
+           SHRINKS so the input box does not move. -->
+      <div id="chat-snips-panel" hidden>
+        <!-- v0.9.101.4 — the count row is GONE (user: 不用出現); the
+             whole panel is just the chip row. -->
+        <div class="snips-row">
+          <div id="chat-snips-list" class="snips-list"></div>
+          <span id="chat-snips-add-wrap" hidden>
+            <!-- v0.9.122.0 — MULTI-LINE adding: textarea (Enter =
+                 newline; Ctrl+Enter or ➕ submits); cap 2000 chars. -->
+            <textarea id="chat-snips-input" maxlength="2000" rows="2"
+                      class="snip-add-area"
+                      data-i18n-ph="snipsPlaceholder"
+                      placeholder="輸入片語或命令（可多行，Enter 換行）…"></textarea>
+            <button id="chat-snips-add" class="btn" data-i18n="snipsAdd">➕ 新增</button>
+          </span>
+          <button id="chat-snips-manage" class="btn" title="Snippets">▼ 顯示新增列</button>
+        </div>
+      </div>
+      <div class="snips-empty" id="chat-snips-empty" data-i18n="snipsEmpty" hidden>
+        尚無片語 — 按「▼ 新增片語」建立；所有裝置共用同一份片語。
+      </div>
+      <div class="chat-input">
+        <textarea id="chat-input" rows="3"
+                  data-i18n-ph="askPlaceholder"
+                  placeholder="Ask anything about your documents…"></textarea>
+        <button id="chat-send" class="btn btn-primary" data-i18n="send">Send ➤</button>
+      </div>
+    </section>
+
+    <!-- ── Ingest tab ── -->
+    <section class="panel" id="panel-ingest" role="tabpanel">
+      <div class="ingest-toolbar">
+        <input type="text" id="ingest-file-path"
+               placeholder="C:\path\to\file.pdf  或  C:\path\to\folder"
+               data-i18n-ph="ingestPlaceholder" />
+        <button id="ingest-go" class="btn btn-primary" data-i18n="ingestRun">▶ Ingest</button>
+        <button id="ingest-pick-file" class="btn" data-i18n="pickFile">📄 Pick file…</button>
+        <button id="ingest-pick-dir"  class="btn" data-i18n="pickDir">📁 Pick folder…</button>
+        <label class="chk">
+          <input type="checkbox" id="ingest-web-only" />
+          <span data-i18n="ingestRecursive">Recursive</span>
+        </label>
+      </div>
+      <div class="ingest-result">
+        <h3 data-i18n="ingestResult">Result</h3>
+        <pre id="ingest-output" class="output" aria-live="polite"></pre>
+      </div>
+      <p class="hint" data-i18n="ingestHint">
+        Tip: pick a folder to ingest every supported file (.pdf .docx .pptx .epub
+        .txt .md .py .json …) recursively. Duplicates are auto-skipped via SHA-1.
+      </p>
+    </section>
+
+    <!-- ── Search tab ── -->
+    <section class="panel" id="panel-search" role="tabpanel">
+      <div class="search-toolbar">
+        <input type="text" id="search-query"
+               placeholder="Search vector database…" data-i18n-ph="searchPlaceholder" />
+        <input type="number" id="search-topk" value="5" min="1" max="50" />
+        <input type="text" id="search-filter"
+               placeholder="filename filter (optional)" data-i18n-ph="searchFilterPlaceholder" />
+        <!-- v0.9.60.0+: collection picker (search ANY collection) -->
+        <select id="search-collection" class="collection-select" title="Collection"></select>
+        <button id="search-go" class="btn btn-primary" data-i18n="search">🔍 Search</button>
+      </div>
+      <div id="search-results" class="results" aria-live="polite"></div>
+    </section>
+
+
+  <!-- ── Admin tab ── -->
+    <section class="panel" id="panel-admin" role="tabpanel">
+      <h2 data-i18n="adminTitle">系統管理</h2>
+      <p class="hint" data-i18n="adminHint">
+        Overview of the running Qdrant collection, embedding backend, and LLM provider.
+        Destructive operations below require confirmation.
+      </p>
+
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h3 data-i18n="qdrantInfo">Qdrant</h3>
+          <dl id="admin-qdrant"></dl>
+        </div>
+        <div class="admin-card">
+          <h3 data-i18n="embedInfo">Embedding</h3>
+          <dl id="admin-embed"></dl>
+          <!-- v0.9.112.0 — hash-pollution audit + repair -->
+          <div class="admin-card-btnrow">
+            <button id="admin-audit-backends" class="btn"
+                    data-i18n="auditBackends">🔎 Audit hash vectors</button>
+            <button id="admin-reembed-hash" class="btn btn-warn"
+                    data-i18n="reembedHash">♻️ Re-embed hash</button>
+            <button id="admin-backfill-headings" class="btn"
+                    data-i18n="backfillHeadings">§ Backfill headings</button>
+          </div>
+          <p class="hint" data-i18n="auditBackendsHint">
+            Audit is read-only; Re-embed re-calls the embedding backend
+            for flagged points (confirm first).
+          </p>
+        </div>
+      </div>
+
+      <!-- ── All-collections inventory + per-row delete (v0.9.59.1+) ── -->
+      <h3 data-i18n="collectionsZone">Collections</h3>
+      <div class="cache-zone">
+        <div class="admin-card collections-card">
+          <table class="admin-table" id="admin-collections"></table>
+          <p class="hint" data-i18n="collectionsHint">
+            刪除為破壞性操作（無法復原），每列需個別確認。
+          </p>
+        </div>
+      </div>
+
+      <h3 data-i18n="cacheZone">Embedding cache</h3>
+      <div class="cache-zone">
+        <div class="danger-item">
+          <div>
+            <strong data-i18n="clearCacheTitle">Clear embedding cache</strong>
+            <p data-i18n="clearCacheHint">
+              Wipes both in-memory LRU and persistent SQLite cache.
+              Next ingest/chat will re-call the embedding API.
+            </p>
+          </div>
+          <button id="admin-clear-cache" class="btn btn-warn" data-i18n="clearCache">🧹 Clear</button>
+        </div>
+      </div>
+
+      <!-- ── hot reload + service restart (v0.9.42.0+) ── -->
+      <h3 data-i18n="reloadZone">設定熱重載</h3>
+      <div class="cache-zone">
+        <div class="danger-item">
+          <div>
+            <strong data-i18n="reloadTitle">重新載入 .env / mcp.json</strong>
+            <p data-i18n="reloadHint">
+              Re-reads .env (typed re-assign), resets the LLM provider
+              chain, restarts daemon services (scheduler / webhook /
+              Telegram / ONVIF watches per their enable-conditions) and
+              reconnects the MCP fleet. Deletion of an env var still
+              needs a restart (dotenv never clears the process env).
+            </p>
+          </div>
+          <button id="admin-reload-config" class="btn" data-i18n="reloadBtn">🔄 Reload</button>
+        </div>
+      </div>
+
+      <!-- ── MCP fleet editor (v0.8.0+) ── -->
+      <div class="admin-section mcp-editor">
+        <h3 data-i18n="mcpEditorTitle">🔌 MCP 設備 (3rd-party servers)</h3>
+        <p class="hint" data-i18n="mcpEditorHint">
+          Edit the active <code>config/mcp.json</code> fleet. Save
+          hot-reloads the manager — the next chat turn uses the new
+          tool set without restarting. Local Qdrant + Web Search
+          hosts are always on and can't be edited here.
+        </p>
+
+        <div class="mcp-toolbar">
+          <button id="mcp-refresh" class="btn"
+                  data-i18n="mcpRefresh">🔄 Refresh</button>
+          <button id="mcp-add" class="btn btn-primary"
+                  data-i18n="mcpAdd">+ Add server</button>
+          <button id="mcp-save-all" class="btn btn-primary"
+                  data-i18n="mcpSaveAll">💾 Save &amp; reload</button>
+          <button id="mcp-toggle-raw" class="btn"
+                  data-i18n="mcpToggleRaw">📝 Raw JSON</button>
+          <button id="mcp-overview-toggle" class="btn"
+                  data-i18n="mcpOverviewToggle">📋 Tool 總覽</button>
+          <span id="mcp-status-summary" class="mcp-status-summary"
+                data-i18n="mcpLoading">loading…</span>
+        </div>
+
+        <div id="mcp-config-path" class="mcp-config-path"></div>
+        <div id="mcp-error-banner" class="mcp-error-banner" hidden></div>
+        <ul id="mcp-server-list" class="mcp-server-list"></ul>
+
+        <!-- ── Raw JSON editor (v0.8.2+, hidden by default) ── -->
+        <div id="mcp-raw-editor" class="mcp-raw-editor" hidden>
+          <div class="mcp-raw-editor-header">
+            <strong data-i18n="mcpRawTitle">
+              📝 直接編輯 config/mcp.json (raw JSON)
+            </strong>
+            <span class="hint" data-i18n="mcpRawHint">
+              整個檔案一次編輯,儲存時做完整 validation + atomic write。
+              適合批次編輯、貼 JSON、或手動改 ``_comment`` 範例。
+            </span>
+          </div>
+          <textarea id="mcp-raw-textarea"
+                    class="mcp-raw-textarea"
+                    spellcheck="false"
+                    autocomplete="off"></textarea>
+          <div class="mcp-raw-editor-actions">
+            <button id="mcp-raw-format" class="btn"
+                    data-i18n="mcpRawFormat">🎨 格式化</button>
+            <button id="mcp-raw-cancel" class="btn"
+                    data-i18n="mcpRawCancel">取消</button>
+            <button id="mcp-raw-save" class="btn btn-primary"
+                    data-i18n="mcpRawSave">💾 儲存 raw JSON</button>
+          </div>
+          <div id="mcp-raw-error" class="mcp-error-banner" hidden></div>
+        </div>
+
+        <!-- ── Tool 總覽 (v0.8.2+, hidden by default) ── -->
+        <div id="mcp-tools-overview" class="mcp-tools-overview" hidden>
+          <div class="mcp-tools-overview-header">
+            <strong data-i18n="mcpOverviewTitle">
+              📋 擴充 MCP 提供哪些功能 (Tool 總覽)
+            </strong>
+            <span class="hint" data-i18n="mcpOverviewHint">
+              目前已連線 / 已註冊的全部 MCP tools,依 server 分組。
+              含本地 Qdrant + Web Search hosts,以及 ``config/mcp.json``
+              中所有啟用的遠端 servers。LLM 下一次對話會從這裡挑選要
+              呼叫的工具。
+            </span>
+          </div>
+          <div id="mcp-tools-overview-content"
+               class="mcp-tools-overview-content">
+            <em data-i18n="mcpOverviewLoading">載入中…</em>
+          </div>
+        </div>
+      </div>
+
+      <h3 data-i18n="dangerZone">Danger zone</h3>
+      <div class="danger-zone">
+        <div class="danger-item">
+          <div>
+            <strong data-i18n="recreateCollection">Recreate collection</strong>
+            <p data-i18n="recreateHint">
+              Drops the collection and recreates with current HNSW config.
+              All vectors are wiped; you'll need to re-ingest.
+            </p>
+          </div>
+          <button id="admin-recreate" class="btn btn-danger" data-i18n="recreate">♻ Recreate</button>
+        </div>
+        <div class="danger-item">
+          <div>
+            <strong data-i18n="deleteCollection">Delete collection</strong>
+            <p data-i18n="deleteHint">
+              Permanently deletes the collection. Cannot be undone.
+            </p>
+          </div>
+          <button id="admin-delete" class="btn btn-danger" data-i18n="delete">✖ Delete</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Stats tab ── -->
+    <section class="panel" id="panel-stats" role="tabpanel">
+      <div class="collection-toolbar">
+        <!-- v0.9.60.0+: stats + paged data browser per collection -->
+        <label for="stats-collections" data-i18n="statCollection">Collection</label>
+        <select id="stats-collections" class="collection-select"></select>
+        <button id="stats-refresh" class="btn" data-i18n="refresh">🔄 Refresh</button>
+        <button id="stats-load-data" class="btn" data-i18n="loadData">📂 載入資料</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label" data-i18n="statCollection">Collection</div><div class="stat-value" id="stat-collection">—</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="statVectors">Vectors</div><div class="stat-value" id="stat-vectors">—</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="statDim">Dim</div><div class="stat-value" id="stat-dim">—</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="statDocs">Documents</div><div class="stat-value" id="stat-docs">—</div></div>
+      </div>
+      <h3 data-i18n="docList">Indexed documents</h3>
+      <div class="doc-list-toolbar">
+        <button id="docs-bulk-delete" class="btn btn-danger" disabled data-i18n="removeSelected">🗑 Remove selected (0)</button>
+      </div>
+      <ul id="stats-doc-list" class="doc-list"></ul>
+
+      <!-- ── v0.9.60.0+: paged point browser + per-row delete ── -->
+      <h3 data-i18n="dataBrowser">資料管理（分頁瀏覽）</h3>
+      <div id="stats-data-info" class="hint"></div>
+      <table class="admin-table" id="stats-data"></table>
+      <div class="pager">
+        <button id="stats-data-prev" class="btn" disabled data-i18n="pagerPrev">⬆ 上一頁</button>
+        <button id="stats-data-next" class="btn" disabled data-i18n="pagerNext">⬇ 下一頁</button>
+        <span id="stats-data-pos" class="hint"></span>
+      </div>
+    </section>
+
+    <!-- ── Sessions tab ── -->
+    <section class="panel" id="panel-sessions" role="tabpanel">
+      <div class="sess-toolbar">
+        <button id="sessions-refresh" class="btn" data-i18n="refresh">🔄 Refresh</button>
+        <label class="chk sess-sel-all-wrap" title="Select all">
+          <input type="checkbox" id="sess-sel-all" />
+          <span data-i18n="sessSelAll">全選</span>
+        </label>
+        <button id="sess-del-sel" class="btn btn-danger" disabled>🗑 刪除所選（0）</button>
+        <button id="sess-export-sel" class="btn" disabled>⬇ 匯出所選（0）</button>
+      </div>
+      <table class="data-table" id="sessions-table">
+        <thead>
+          <tr>
+            <th class="sel-col" aria-label="select"></th>
+            <th>ID</th><th data-i18n="thTitle">Title</th>
+            <th data-i18n="thMsgs">Msgs</th>
+            <th data-i18n="thUpdated">Updated</th>
+            <th data-i18n="thSummary">Summary</th>
+            <th data-i18n="thActions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="sessions-tbody"></tbody>
+      </table>
+    </section>
+
+    <!-- ── Credentials tab (v0.9.39.0+) ── -->
+    <section class="panel" id="panel-creds" role="tabpanel">
+      <h2 data-i18n="credsTitle">🔑 Credentials</h2>
+      <p class="hint" data-i18n="credsHint">
+        Central account sets shared by every service that needs a
+        login (ONVIF cameras, …). Passwords are RECOMMENDED as env
+        references (the store never holds the secret); plain
+        passwords are stored base64-OBSCURED, not encrypted.
+        Managed here, via MCP (cred_add / cred_list / …) and the CLI
+        (python cli.py creds …).
+      </p>
+      <button id="creds-refresh" class="btn" data-i18n="refresh">🔄 Refresh</button>
+      <table class="data-table" id="creds-table">
+        <thead>
+          <tr>
+            <th data-i18n="thName">Name</th>
+            <th data-i18n="credsUser">User</th>
+            <th data-i18n="credsSource">Source</th>
+            <th data-i18n="credsService">Service</th>
+            <th data-i18n="credsNotes">Notes</th>
+            <th data-i18n="thActions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="creds-tbody"></tbody>
+      </table>
+      <h3 data-i18n="credsAddTitle">Add / replace credential set</h3>
+      <div class="cred-form">
+        <input id="cred-name" placeholder="name" />
+        <input id="cred-user" placeholder="username" />
+        <input id="cred-pw" type="password" placeholder="password (optional)" />
+        <input id="cred-pw-env" placeholder="password env var (recommended)" />
+        <input id="cred-service" placeholder="service (onvif)" />
+        <input id="cred-notes" placeholder="notes" />
+        <label class="chk"><input type="checkbox" id="cred-overwrite" /><span data-i18n="credsOverwrite">overwrite existing</span></label>
+        <button id="cred-save" class="btn" data-i18n="credsSave">💾 Save</button>
+      </div>
+    </section>
+
+    <!-- ── Schedules tab ── -->
+    <section class="panel" id="panel-schedules" role="tabpanel">
+      <h2 data-i18n="schedulesTitle">⏰ Schedules</h2>
+      <p class="hint" data-i18n="schedulesHint">
+        Run prompts on a cron / interval / one-shot trigger. Every
+        fire uses the full tool surface (web_search, mcp_server, …)
+        and writes to a dedicated session. The scheduler daemon
+        lives inside the agent — open this tab while the agent is
+        running to see live status.
+      </p>
+      <div class="schedule-toolbar">
+        <button id="schedules-refresh" class="btn"
+                data-i18n="refresh">🔄 Refresh</button>
+        <button id="schedules-add" class="btn btn-primary"
+                data-i18n="schedulesAdd">+ Add schedule</button>
+        <label class="chk">
+          <input type="checkbox" id="schedules-enabled-only" />
+          <span data-i18n="schedulesEnabledOnly">Enabled only</span>
+        </label>
+        <span id="schedules-status" class="schedule-status"
+              data-i18n="schedulesLoading">loading…</span>
+      </div>
+      <table class="data-table" id="schedules-table">
+        <thead>
+          <tr>
+            <th data-i18n="thName">Name</th>
+            <th data-i18n="thType">Type</th>
+            <th data-i18n="thNextFire">Next fire</th>
+            <th data-i18n="thFires">Fires</th>
+            <th data-i18n="thEnabled">Enabled</th>
+            <th data-i18n="thActions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="schedules-tbody"></tbody>
+      </table>
+    </section>
+
+    <!-- ── Notes tab（v0.9.95.0+ — 本地筆記本；分頁瀏覽永不整表傾倒） ── -->
+    <section class="panel" id="panel-notes" role="tabpanel">
+      <h2 data-i18n="notesTitle">📝 筆記本</h2>
+      <p class="hint" data-i18n="notesHint">
+        本地筆記本（markdown）— 新增 / 刪除 / 修改 / 搜尋（日期・標題・內容）／
+        分類。清單逐頁非同步載入，不整表傾倒。
+      </p>
+      <div class="notes-toolbar">
+        <input id="notes-q" type="search" data-i18n-ph="notesSearchPh"
+               placeholder="搜尋標題／內容…" />
+        <select id="notes-cat"><option value="" data-i18n="notesAllCats">全部分類</option></select>
+        <input id="notes-from" type="date" title="from" />
+        <input id="notes-to" type="date" title="to" />
+        <button id="notes-search-btn" class="btn" data-i18n="notesSearch">🔍 搜尋</button>
+        <button id="notes-new-btn" class="btn primary" data-i18n="notesNew">➕ 新增</button>
+        <button id="notes-list-toggle" class="btn" data-i18n="notesListShow">📋 顯示清單</button>
+        <!-- v0.9.124.9 — offline sync (web mode only; the JS shows/hides
+             this button and owns the "(N)" pending label) -->
+        <button id="notes-sync-btn" class="btn" hidden>🔄 同步</button>
+        <button id="notes-hw-btn" class="btn" data-i18n="notesHw">✍️ 手寫</button>
+      </div>
+      <div id="notes-offline-banner" class="notes-offline-banner" hidden></div>
+      <!-- v0.9.124.9 — offline-first cache banner (web mode only) -->
+      <div id="notes-list" class="notes-list" hidden></div>
+      <div id="notes-list-tools" class="notes-toolbar ap-row" style="margin-top:6px" hidden>
+        <button id="notes-expand-all" class="btn" data-i18n="notesExpandAll">▾ 全部展開</button>
+        <button id="notes-collapse-all" class="btn" data-i18n="notesCollapseAll">▸ 全部收合</button>
+      </div>
+      <div id="notes-pager" class="notes-pager" hidden>
+        <button id="notes-prev" class="btn">←</button>
+        <span id="notes-pageinfo"></span>
+        <button id="notes-next" class="btn">→</button>
+      </div>
+
+      <!-- v0.9.125.0 — handwriting note modal (canvas → host OCR →
+           note + index). touch-action:none keeps phone scrolling from
+           stealing the strokes; the canvas is DPI-scaled in JS.
+           v0.9.125.1 — FULLSCREEN mode, MULTI-PAGE (加頁/翻頁), a
+           handwriting BACKGROUND IMAGE picker (baked into the PNG so
+           OCR sees it too), and pointer-coalesced strokes (the
+           Android-stylus anti-lag fix). -->
+      <div id="hw-modal" class="hw-modal" hidden>
+        <div class="hw-box">
+          <div class="hw-head">
+            <span class="hw-title" data-i18n="hwTitle">✍️ 手寫記事</span>
+            <span id="hw-pageinfo" class="hw-pageinfo"></span>
+            <button id="hw-full" class="btn" data-i18n-title="hwFull" title="全螢幕">⛶</button>
+            <button id="hw-close" class="btn">✕</button>
+          </div>
+          <input id="hw-note-title" type="text" data-i18n-ph="notesTitlePh"
+                 placeholder="標題（可留空）" />
+          <canvas id="hw-canvas" class="hw-canvas"></canvas>
+          <!-- v0.9.125.7 — writing tools: 🖊 pen (multi-colour +
+               adjustable width), 🖍 marker (multi-colour, translucent),
+               🧽 eraser. Chips + picker + slider edit the CURRENT
+               tool's config; switching a tool re-loads its config. -->
+          <div class="hw-row hw-tools-row">
+            <button id="hw-tool-pen" class="btn hw-tool active" data-i18n-title="hwPen" title="筆">🖊</button>
+            <button id="hw-tool-marker" class="btn hw-tool" data-i18n-title="hwMarker" title="螢光">🖍</button>
+            <button id="hw-tool-eraser" class="btn hw-tool" data-i18n-title="hwEraser" title="擦">🧽</button>
+            <span class="hw-chip" data-col="#000000"></span>
+            <span class="hw-chip" data-col="#1a46c8"></span>
+            <span class="hw-chip" data-col="#cf1d1d"></span>
+            <span class="hw-chip" data-col="#7dd87d"></span>
+            <span class="hw-chip" data-col="#ff7ab8"></span>
+            <span class="hw-chip" data-col="#ffe94a"></span>
+            <input id="hw-color" type="color" value="#000000" class="hw-color" title="自訂顏色" />
+            <input id="hw-width" type="range" min="1" max="28" value="3" class="hw-width" />
+            <span id="hw-width-val" class="hw-width-val">3</span>
+          </div>
+          <div class="hw-row">
+            <button id="hw-prev" class="btn hw-pg">←</button>
+            <button id="hw-addpage" class="btn hw-pg" data-i18n-title="hwPageAdd" title="加頁">➕</button>
+            <button id="hw-next" class="btn hw-pg">→</button>
+            <span class="hw-hint" id="hw-hint"></span><!-- v0.9.126.5 — idle hint text REMOVED (user request); this span is the save/PDF-import status line only -->
+            <button id="hw-bg-clear" class="btn" hidden data-i18n-title="hwBgClear" title="去除背景">✕</button>
+            <button id="hw-bg-btn" class="btn" data-i18n-title="hwBg" title="背景圖">🖼</button>
+            <!-- v0.9.125.6 — PDF underlay import: each PDF page becomes
+                 the corresponding handwriting page's background -->
+            <button id="hw-pdf-btn" class="btn" data-i18n-title="hwPdf" title="匯入 PDF">📄</button>
+            <button id="hw-full2" class="btn" data-i18n-title="hwFull" title="全螢幕">⛶</button>
+            <button id="hw-clear" class="btn" data-i18n-title="hwClear" title="清除">🧹</button>
+            <button id="hw-save" class="btn primary" data-i18n-title="hwSave" title="儲存並 OCR">💾</button>
+          </div>
+          <input id="hw-bg-file" type="file" accept="image/png,image/jpeg" hidden />
+          <input id="hw-pdf-file" type="file" accept="application/pdf,.pdf" hidden />
+        </div>
+      </div>
+      <!-- v0.9.125.1 — 可看圖: archived handwriting preview inside the
+           notes editor (populated when the note body links a PNG) -->
+      <div id="ne-hw-img" class="ne-hw-img" hidden></div>
+
+      <div id="notes-editor" class="notes-editor" hidden>
+        <input id="ne-title" type="text" data-i18n-ph="notesTitlePh"
+               placeholder="標題…" />
+        <input id="ne-category" type="text" list="ne-cats"
+               data-i18n-ph="notesCatPh" placeholder="分類（可空）" />
+        <datalist id="ne-cats"></datalist>
+        <div class="ne-toolbar">
+          <button class="btn ne-btn" data-md="bold"  title="Bold">B</button>
+          <button class="btn ne-btn" data-md="italic" title="Italic">I</button>
+          <button class="btn ne-btn" data-md="h2"    title="H2">H2</button>
+          <button class="btn ne-btn" data-md="code"  title="Code">&lt;/&gt;</button>
+          <button class="btn ne-btn" data-md="fence" title="Fence">```</button>
+          <button class="btn ne-btn" data-md="ul"    title="List">•</button>
+          <button class="btn ne-btn" data-md="quote" title="Quote">❝</button>
+          <button class="btn ne-btn" data-md="link"  title="Link">🔗</button>
+          <button class="btn ne-btn" data-md="table" title="Table">▦</button>
+          <span class="ne-spacer"></span>
+          <button id="ne-preview-btn" class="btn" data-i18n="notesPreview">👁 預覽</button>
+        </div>
+        <textarea id="ne-body" rows="14"
+                  data-i18n-ph="notesBodyPh"
+                  placeholder="markdown 內容…"></textarea>
+        <!-- v0.9.132.9 — clipboard row for the document body: copy /
+             cut the selection (or the whole body when nothing is
+             selected) / paste at the cursor (mobile-friendly). -->
+        <div class="ne-clip-row">
+          <button id="ne-clip-copy" class="btn" data-i18n-title="clipCopySel" title="Copy">📋</button>
+          <button id="ne-clip-cut" class="btn" data-i18n-title="clipCutSel" title="Cut">✂️</button>
+          <button id="ne-clip-paste" class="btn" data-i18n-title="clipPasteSel" title="Paste">📥</button>
+        </div>
+        <div id="ne-preview" class="ne-preview" hidden></div>
+        <div class="ne-statusbar">
+          <span id="ne-status-chars">0</span> <span data-i18n="notesSbChars">字</span>
+          <span class="ne-sb-sep">·</span>
+          <span id="ne-status-lines">1</span> <span data-i18n="notesSbLines">行</span>
+          <span class="ne-sb-sep">·</span>
+          <span id="ne-status-saved" data-i18n="notesSbSaved">已自動存於瀏覽器</span>
+          <span class="ne-spacer"></span>
+          <span id="ne-status-pos"></span>
+        </div>
+        <div class="ne-actions">
+          <button id="ne-save" class="btn primary" data-i18n="notesSave">💾 儲存</button>
+          <button id="ne-delete" class="btn danger" data-i18n="notesDelete">🗑 刪除</button>
+          <button id="ne-cancel" class="btn" data-i18n="notesCancel">✖ 關閉</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Boot splash overlay (v0.8.7+) ──
+       Shows during readiness checks (backend / Qdrant / LLM keys).
+       Skip button lets the user bail out if any check stalls;
+       per-check timeout (5 s) also forces a fail so the overlay
+       can never block the main app indefinitely. -->
+  <div id="splash-overlay" class="splash-overlay" role="dialog"
+       aria-modal="true" aria-labelledby="splash-title">
+    <div class="splash-card">
+      <div class="splash-spinner" aria-hidden="true">
+        <svg viewBox="0 0 50 50" width="48" height="48">
+          <!-- circumference = 2π·20 ≈ 125.66;
+               dash 94.25 / 31.42 = 75% arc / 25% gap so rotation is
+               visible. The previous "80 40" was 4% gap which read
+               as a near-solid ring. -->
+          <circle cx="25" cy="25" r="20" fill="none"
+                  stroke="currentColor" stroke-width="4"
+                  stroke-linecap="round"
+                  stroke-dasharray="94.25 31.42"
+                  transform="rotate(-90 25 25)" />
+        </svg>
+      </div>
+      <h2 id="splash-title"
+          class="splash-title"
+          data-i18n="splashTitle">Divine Sense Agent</h2>
+      <p class="splash-version" id="splash-version"></p>
+      <p class="splash-status"
+         id="splash-status"
+         data-i18n="splashChecking">檢查資源中…</p>
+      <ul class="splash-checks" id="splash-checks">
+        <li data-check="backend" data-state="pending">
+          <span class="splash-check-icon">⏳</span>
+          <span class="splash-check-label"
+                data-i18n="readinessBackend">後端 API</span>
+          <span class="splash-check-detail"></span>
+        </li>
+        <li data-check="qdrant" data-state="pending">
+          <span class="splash-check-icon">⏳</span>
+          <span class="splash-check-label"
+                data-i18n="readinessQdrant">Qdrant 連線</span>
+          <span class="splash-check-detail"></span>
+        </li>
+        <li data-check="llm" data-state="pending">
+          <span class="splash-check-icon">⏳</span>
+          <span class="splash-check-label"
+                data-i18n="readinessLLM">LLM API 金鑰</span>
+          <span class="splash-check-detail"></span>
+        </li>
+        <li data-check="mcp" data-state="pending">
+          <span class="splash-check-icon">⏳</span>
+          <span class="splash-check-label"
+                data-i18n="readinessMcp">MCP 工具初始化</span>
+          <span class="splash-check-detail"></span>
+        </li>
+      </ul>
+      <button id="splash-skip"
+              class="splash-skip btn"
+              data-i18n="splashSkip">略過 →</button>
+    </div>
+  </div>
+
+  <footer class="statusbar">
+    <span id="status-qdrant" class="dot" data-state="unknown">⏳</span>
+    <span data-i18n="qdrant">Qdrant</span>
+    <span class="sep">·</span>
+    <span id="status-llm" class="dot" data-state="unknown">⏳</span>
+    <span data-i18n="llm">LLM</span>
+    <span class="sep">·</span>
+    <span id="status-detail"></span>
+  </footer>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- ── MCP server edit modal (v0.8.0+) ── -->
+  <div id="mcp-edit-modal" class="modal" hidden role="dialog"
+       aria-modal="true" aria-labelledby="mcp-edit-title">
+    <div class="modal-content">
+      <header class="modal-header">
+        <h3 id="mcp-edit-title" data-i18n="mcpEditTitle">Edit MCP server</h3>
+        <button id="mcp-edit-close" class="modal-close" aria-label="Close">×</button>
+      </header>
+      <form id="mcp-edit-form" class="mcp-edit-form" autocomplete="off">
+        <input type="hidden" id="mcp-edit-orig-name" />
+
+        <label class="field">
+          <span data-i18n="mcpFieldName">Name</span>
+          <input id="mcp-edit-name" type="text" required
+                 pattern="[A-Za-z0-9_.\-]+"
+                 data-i18n-ph="mcpFieldNamePh"
+                 placeholder="my-server" />
+          <small class="hint"
+                 data-i18n="mcpFieldNameHint">
+            Used as the tool prefix. Must be unique across the fleet.
+          </small>
+        </label>
+
+        <label class="field">
+          <span data-i18n="mcpFieldTransport">Transport</span>
+          <select id="mcp-edit-transport">
+            <option value="stdio">stdio (local subprocess)</option>
+            <option value="streamable_http">streamable_http (modern)</option>
+            <option value="sse">sse (legacy)</option>
+          </select>
+        </label>
+
+        <!-- stdio fields -->
+        <div class="mcp-transport-fields" data-transport="stdio">
+          <label class="field">
+            <span data-i18n="mcpFieldCommand">Command</span>
+            <input id="mcp-edit-command" type="text"
+                   data-i18n-ph="mcpFieldCommandPh"
+                   placeholder="python -m my_mcp_server" />
+            <small class="hint" data-i18n="mcpFieldCommandHint">
+              Split by whitespace into an argv array on save.
+            </small>
+          </label>
+          <label class="field">
+            <span data-i18n="mcpFieldEnv">Env (KEY=value, one per line)</span>
+            <textarea id="mcp-edit-env" rows="3"
+                      data-i18n-ph="mcpFieldEnvPh"
+                      placeholder="MY_TOKEN=&#10;DEBUG=1"></textarea>
+          </label>
+          <label class="field">
+            <span data-i18n="mcpFieldCwd">Working dir (optional)</span>
+            <input id="mcp-edit-cwd" type="text"
+                   data-i18n-ph="mcpFieldCwdPh"
+                   placeholder="/path/to/server" />
+          </label>
+        </div>
+
+        <!-- http/sse fields -->
+        <div class="mcp-transport-fields" data-transport="streamable_http">
+          <label class="field">
+            <span data-i18n="mcpFieldUrl">Endpoint URL</span>
+            <input id="mcp-edit-url-sh" type="url"
+                   data-i18n-ph="mcpFieldUrlPh"
+                   placeholder="https://mcp.example.com/v1/mcp" />
+          </label>
+          <label class="field">
+            <span data-i18n="mcpFieldHeaders">Headers (KEY=value, one per line)</span>
+            <textarea id="mcp-edit-headers-sh" rows="3"
+                      data-i18n-ph="mcpFieldHeadersPh"
+                      placeholder="Authorization=Bearer ${MY_TOKEN}"></textarea>
+            <small class="hint" data-i18n="mcpFieldHeadersHint">
+              <code>${ENV_VAR}</code> references are substituted at
+              connect time.
+            </small>
+          </label>
+        </div>
+
+        <div class="mcp-transport-fields" data-transport="sse">
+          <label class="field">
+            <span data-i18n="mcpFieldUrl">Endpoint URL</span>
+            <input id="mcp-edit-url-sse" type="url"
+                   data-i18n-ph="mcpFieldUrlPh"
+                   placeholder="https://mcp.example.com/sse" />
+          </label>
+          <label class="field">
+            <span data-i18n="mcpFieldHeaders">Headers (KEY=value, one per line)</span>
+            <textarea id="mcp-edit-headers-sse" rows="3"
+                      data-i18n-ph="mcpFieldHeadersPh"
+                      placeholder="Authorization=Bearer ${MY_TOKEN}"></textarea>
+          </label>
+        </div>
+
+        <div id="mcp-edit-error" class="mcp-edit-error" hidden></div>
+
+        <footer class="modal-footer">
+          <button type="button" id="mcp-edit-cancel" class="btn"
+                  data-i18n="cancel">Cancel</button>
+          <button type="submit" id="mcp-edit-save" class="btn btn-primary"
+                  data-i18n="save">💾 Save</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Schedule edit modal (v0.8.0+) ── -->
+  <div id="schedule-edit-modal" class="modal" hidden role="dialog"
+       aria-modal="true" aria-labelledby="schedule-edit-title">
+    <div class="modal-content">
+      <header class="modal-header">
+        <h3 id="schedule-edit-title" data-i18n="scheduleEditTitle">Edit schedule</h3>
+        <button id="schedule-edit-close" class="modal-close"
+                aria-label="Close">×</button>
+      </header>
+      <form id="schedule-edit-form" class="mcp-edit-form" autocomplete="off">
+        <input type="hidden" id="schedule-edit-orig-id" />
+
+        <label class="field">
+          <span data-i18n="scheduleFieldName">Name</span>
+          <input id="schedule-edit-name" type="text" required />
+        </label>
+
+        <label class="field">
+          <span data-i18n="scheduleFieldPrompt">Prompt</span>
+          <textarea id="schedule-edit-prompt" rows="3" required></textarea>
+          <small class="hint" data-i18n="scheduleFieldPromptHint">
+            Runs through Agent.chat_turn with full tool surface —
+            web_search and any registered MCP server are available.
+          </small>
+        </label>
+
+        <label class="field">
+          <span data-i18n="scheduleFieldType">Schedule type</span>
+          <select id="schedule-edit-type">
+            <option value="interval_seconds">interval_seconds</option>
+            <option value="cron">cron (5-field)</option>
+            <option value="once_at">once_at (ISO datetime)</option>
+          </select>
+        </label>
+
+        <div class="schedule-transport-fields"
+             data-stype="interval_seconds">
+          <label class="field">
+            <span data-i18n="scheduleFieldInterval">Interval (seconds)</span>
+            <input id="schedule-edit-interval" type="number" min="1"
+                   placeholder="3600" />
+            <small class="hint" data-i18n="scheduleFieldIntervalHint">
+              60 = every minute, 3600 = every hour, 86400 = every day.
+            </small>
+          </label>
+        </div>
+
+        <div class="schedule-transport-fields" data-stype="cron">
+          <label class="field">
+            <span data-i18n="scheduleFieldCron">Cron expression</span>
+            <input id="schedule-edit-cron" type="text"
+                   placeholder="0 9 * * *" />
+            <small class="hint" data-i18n="scheduleFieldCronHint">
+              minute / hour / day-of-month / month / day-of-week
+              (0-6, Sun=0). Examples: <code>0 9 * * *</code> daily at 9am,
+              <code>*/15 * * * *</code> every 15 min, <code>0 0 * * 1</code>
+              weekly Monday midnight.
+            </small>
+          </label>
+        </div>
+
+        <div class="schedule-transport-fields" data-stype="once_at">
+          <label class="field">
+            <span data-i18n="scheduleFieldOnceAt">Fire at (ISO datetime)</span>
+            <input id="schedule-edit-once-at" type="text"
+                   placeholder="2026-12-31T23:59:00" />
+          </label>
+        </div>
+
+        <div class="field schedule-flags">
+          <label class="chk">
+            <input type="checkbox" id="schedule-edit-use-tools" />
+            <span data-i18n="scheduleFieldUseTools">Use MCP tools</span>
+          </label>
+          <label class="chk">
+            <input type="checkbox" id="schedule-edit-enabled" />
+            <span data-i18n="scheduleFieldEnabled">Enabled</span>
+          </label>
+        </div>
+
+        <!-- v0.9.133.12 — the web-search toggle & max-results fields were
+             removed: use_web_search is prompt-only in the tool-loop
+             chat path (real web capability is chosen automatically by
+             ToolRoute/Jev), so the checkboxes were inert. -->
+        <div id="schedule-edit-error" class="mcp-edit-error" hidden></div>
+
+        <footer class="modal-footer">
+          <button type="button" id="schedule-edit-cancel" class="btn"
+                  data-i18n="cancel">Cancel</button>
+          <button type="submit" id="schedule-edit-save" class="btn btn-primary"
+                  data-i18n="save">💾 Save</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

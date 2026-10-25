@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v0.9.126.2 — platform Material theme only: no AppCompat/Material
+         artifacts (the wrapper is zero-dependency so the no-gradle
+         android/build_apk.py assembler can compile the app too). -->
+    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#1a1b1e</item>
+    </style>
+</resources>

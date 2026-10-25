@@ -1,0 +1,10 @@
+// v0.9.125.9 — Divine Sense Agent launcher (root build)
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+}

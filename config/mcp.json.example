@@ -1,0 +1,200 @@
+{
+  "$comment": [
+    "divine-sense-agent MCP fleet config (v0.8.0+).",
+    "Copy this file to mcp.json and edit it to subscribe your",
+    "agent to third-party MCP servers alongside the in-process",
+    "Qdrant + Web Search hosts the binary always registers.",
+    "",
+    "Schema:",
+    "  servers[]: {",
+    "    name:       logical name (used as tool prefix on collisions),",
+    "    transport:  'stdio' | 'streamable_http' | 'http_sse' | 'sse',",
+    "    command:    [argv0, argv1, ...] - required for stdio,",
+    "    url:        endpoint URL - required for *_http / sse,",
+    "    headers:    { 'Header-Name': 'value' or '${ENV_VAR}' },",
+    "    env:        { 'VAR': 'value' } for stdio child process,",
+    "    cwd:        optional child working directory,",
+    "    timeout:    per-request HTTP timeout (seconds, default 30),",
+    "    sse_read_timeout: SSE keepalive (seconds, default 300)",
+    "  }",
+    "",
+    "If this file is missing or invalid, the agent runs with",
+    "the local hosts only (Qdrant + Web Search). Failures to",
+    "connect are recorded in McpManager.failed and surfaced via",
+    "'/tools status' in chat or list_mcp_tools() in the GUI.",
+    "",
+    "Pitfall (v0.9.68.1): a stdio entry MUST launch a REAL MCP",
+    "server. npm packages WITHOUT a bin field (e.g. Pi-agent",
+    "extensions like @injaneity/pi-computer-use) cannot run via",
+    "'npx -y' — npm exits with 'could not determine executable",
+    "to run' and the manager logs McpError('Connection closed').",
+    "Verify before adding: 'npm view <pkg> bin' must print a bin",
+    "name, and the package must speak the MCP JSON-RPC protocol.",
+    "",
+    "Examples below are commented out - delete the leading '_'",
+    "on the first key of each entry to activate it."
+  ],
+
+  "servers": [
+
+    {
+      "_google_calendar_explain": "Google Calendar via the community stdio MCP (@cocal/google-calendar-mcp, npx). Prereqs: Google Cloud project with the Calendar API enabled + OAuth 2.0 DESKTOP-APP credentials JSON (the path below); first start opens a browser for the consent flow (tokens land in ~/.config/google-calendar-mcp/). Add the server name to MCP_ACTIVE_SERVERS in .env or the tools stay hidden (gate contract). Delete the leading '_' on the first key to activate. 13 tools: list-calendars / list-events / search-events / create-event(s) / update-event / delete-event / get-freebusy / manage-accounts ...",
+      "_name": "google-calendar",
+      "_transport": "stdio",
+      "_command": ["npx", "-y", "@cocal/google-calendar-mcp"],
+      "_env": {
+        "GOOGLE_OAUTH_CREDENTIALS": "C:/absolute/path/to/gcp-oauth.keys.json"
+      }
+    },
+
+    {
+      "_stdio_qdrant_explain": "Spawn our own MCP server as a child process. Useful for debugging the protocol or for sharing the Qdrant agent's tools with other hosts.",
+      "_comment": "This entry connects back to the same Qdrant collection via the public MCP server module. Not necessary when running locally - the agent already calls QdrantStore / Retriever directly.",
+      "name": "qdrant-external",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.server"],
+      "cwd": "."
+    },
+    {
+      "_streamable_http_example": "Modern Streamable HTTP transport (MCP 2025-03-26+).",
+      "_comment": "Replace url + headers with your server's details. Headers support ${ENV_VAR} syntax.",
+      "name": "notion",
+      "transport": "streamable_http",
+      "url": "https://mcp.notion.com/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer ${NOTION_TOKEN}"
+      },
+      "timeout": 30
+    },
+    {
+      "_sse_legacy_example": "Legacy HTTP+SSE transport (MCP 2024-11-05 spec). Notion / Linear / etc. servers used to ship this way.",
+      "name": "linear",
+      "transport": "sse",
+      "url": "https://mcp.linear.app/sse",
+      "headers": {
+        "Authorization": "Bearer ${LINEAR_TOKEN}"
+      }
+    },
+
+    {
+      "_telegram_bot": "Telegram Bot gateway (v0.8.1+). Spawns our own stdio server; the bot can ONLY send to chat IDs in TELEGRAM_ALLOWED_CHAT_IDS. Get the token from @BotFather and the chat_id by messaging @userinfobot / @RawDataBot from the target account.",
+      "name": "telegram",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.telegram_server"],
+      "env": {
+        "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}",
+        "TELEGRAM_ALLOWED_CHAT_IDS": "${TELEGRAM_ALLOWED_CHAT_IDS}"
+      }
+    },
+    {
+      "_scheduler": "Scheduler MCP (v0.8.6+). Drives ScheduleManager from external MCP clients (Claude Desktop / Cline). NOTE: the in-process SchedulerLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this if you want a separate client to manage the same schedules. Reads / writes $QDRANT_RAG_HOME/schedules/<id>.json directly, so any change is visible in the qdrant-rag-agent Schedules tab immediately.",
+      "name": "scheduler",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.scheduler_server"]
+    },
+    {
+      "_openwith": "Open-with MCP (v0.9.6.0+). Explorer-style 'open with the associated application' for chat artifacts: open_file(path) / open_content(name, content) / list_openable_types(). Shares the QDRANT_FILESYSTEM_WRITE_ROOT sandbox with the filesystem MCP; .drawio artifacts are routed to the in-GUI Drawio Viewer when a GUI is running, otherwise the OS file association handles them; executables are refused. NOTE: the in-process OpenWithLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this for external clients.",
+      "name": "openwith",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.openwith_server"]
+    },
+    {
+      "_exec": "Exec MCP (v0.9.9+). Sandboxed local compute for the LLM: run_shell (platform native), run_bash (GNU toolchain: awk/grep/sed pipelines), run_grep (pure-Python grep over sandbox files), run_awk (system awk column surgery), run_python (sys.executable -c — json/csv/regex conversion). cwd = filesystem WRITE sandbox; child env exposes QDRANT_READ_ROOT/QDRANT_WRITE_ROOT; per-call timeouts (default 30 s, cap 120 s), output caps (64 KB) and a machine-level disaster blocklist (rm -rf /, mkfs, format, del /f /s, shutdown... — sandbox file operations are allowed). NOTE: the in-process ExecLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this stdio server for external clients.",
+      "name": "exec",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.exec_server"],
+      "env": {
+        "QDRANT_FILESYSTEM_READ_ROOT": "${QDRANT_FILESYSTEM_READ_ROOT}",
+        "QDRANT_FILESYSTEM_WRITE_ROOT": "${QDRANT_FILESYSTEM_WRITE_ROOT}",
+        "QDRANT_EXEC_TIMEOUT": "${QDRANT_EXEC_TIMEOUT}",
+        "QDRANT_EXEC_MAX_OUTPUT": "${QDRANT_EXEC_MAX_OUTPUT}",
+        "QDRANT_EXEC_BLOCKLIST": "${QDRANT_EXEC_BLOCKLIST}"
+      }
+    },
+    {
+      "_archive": "Archive MCP (v0.9.8+). Compress / decompress files inside the filesystem sandboxes: archive_create(files, out_path, format=zip|7z|tar|tar.gz|tar.bz2|gz), archive_extract(path, to_dir, members?, overwrite?) with Zip-Slip blocking + dangerous-executable skipping + zip-bomb bounds, archive_list(path), list_archive_formats(). 7z uses the py7zr package. NOTE: the in-process ArchiveLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this stdio server for external clients.",
+      "name": "archive",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.archive_server"],
+      "env": {
+        "QDRANT_FILESYSTEM_READ_ROOT": "${QDRANT_FILESYSTEM_READ_ROOT}",
+        "QDRANT_FILESYSTEM_WRITE_ROOT": "${QDRANT_FILESYSTEM_WRITE_ROOT}",
+        "QDRANT_ARCHIVE_MAX_BYTES": "${QDRANT_ARCHIVE_MAX_BYTES}",
+        "QDRANT_ARCHIVE_MAX_FILES": "${QDRANT_ARCHIVE_MAX_FILES}"
+      }
+    },
+    {
+      "_loganalyzer": "Log anomaly analysis MCP (v0.9.7+). Ingests web-server access logs (Apache/Nginx combined) and system logs (syslog RFC3164/RFC5424) into a dedicated Qdrant collection (QDRANT_LOG_COLLECTION, default log_docs) one vector per line, then analyses them for anomalies: rule-based statistics (HTTP error rate, 404 scanning, high-frequency IPs, SQLi paths, scanner user-agents, SSH brute force, OOM/kernel events, log floods) plus semantic outliers. NOTE: the in-process LogAnalysisLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this stdio server for external clients (Claude Desktop / Cline).",
+      "name": "loganalyzer",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.log_analyzer_server"],
+      "env": {
+        "QDRANT_URL": "${QDRANT_URL}",
+        "QDRANT_LOG_COLLECTION": "${QDRANT_LOG_COLLECTION}",
+        "QDRANT_LOG_ALLOWED_ROOT": "${QDRANT_LOG_ALLOWED_ROOT}",
+        "EMBEDDING_DIM": "${EMBEDDING_DIM}",
+        "EMBEDDING_BACKEND": "${EMBEDDING_BACKEND}"
+      }
+    },
+    {
+      "_chat_history": "Chat-history query MCP (v0.9.21+). Lets an external MCP client (Claude Desktop / Cline) query the qdrant-rag-agent persisted chat sessions: list_chat_sessions(keyword?, limit?, include_scheduled?), search_chat_history(keyword, sid?, role?, limit?, max_chars?, include_scheduled?), get_chat_session(sid, last_n?, max_msg_chars?). All READ-ONLY with built-in caps (a runaway history dump can never blow the context window); scheduler-fire sessions (sid prefix sched-) are hidden by default. Reads $QDRANT_RAG_HOME/sessions/<sid>.json directly. NOTE: the in-process ChatHistoryLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this stdio server for external clients.",
+      "name": "chat-history",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.chat_history_server"],
+      "env": {
+        "QDRANT_RAG_HOME": "${QDRANT_RAG_HOME}"
+      }
+    },
+    {
+      "_stock": "Mega Securities (兆豐) stock query + order MCP (v0.9.24+; live wired v0.9.26.0). Tools: stock_get_quote(symbol), stock_get_kline(symbol, interval=day|week|month, bars=1-200), stock_get_account_summary(), stock_list_orders(status=all|open|filled|cancelled, limit), stock_place_order(symbol, side=buy|sell, qty, price?, order_type=limit|market, confirm), stock_cancel_order(order_id). MOCK-FIRST SAFETY: MEGA_STOCK_MODE=mock (the default) runs a fully simulated in-memory book — quotes/orders are deterministic mock data (simulated=true) and place_order NEVER touches the real MegaAPI. LIVE (wired since v0.9.26.0): the megaspeedy component lives in the PROJECT ROOT megaSpeedy/ folder (DLL + wrapper py + Temp/); live queries (account/orders/klines/quote snapshot) work after the API permission opens (login spapi.emega.com.tw:56789 via LogonProxy; quotes 119.31.179.86:34567); live ORDER placement STILL REQUIRES THREE gates — mode=live + MEGA_STOCK_TRADING_ENABLED=on + per-call confirm=true — plus the certificate gate (MEGA_STOCK_CERT_PATH/MEGA_STOCK_CERT_PASSWORD via EnableMEGACA; queries need no cert). Docs: https://www.emega.com.tw/emega/upload/megaapi/teach0.html. NOTE: the in-process MegaStockLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this stdio server for external clients. Development/testing: keep MEGA_STOCK_MODE=mock.",
+      "name": "stock",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.stock_server"],
+      "env": {
+        "MEGA_STOCK_MODE": "${MEGA_STOCK_MODE}",
+        "MEGA_STOCK_TRADING_ENABLED": "${MEGA_STOCK_TRADING_ENABLED}",
+        "MEGA_STOCK_ID": "${MEGA_STOCK_ID}",
+        "MEGA_STOCK_PASSWORD": "${MEGA_STOCK_PASSWORD}",
+        "MEGA_STOCK_ACCOUNT": "${MEGA_STOCK_ACCOUNT}",
+        "MEGA_STOCK_BRANCH": "${MEGA_STOCK_BRANCH}"
+      }
+    },
+    {
+      "_hicloud": "hicloud HWS (Chunghwa Telecom CaaS/CVPC) cloud MCP (v0.9.64.0+; FULL SERVICE SURFACE since v0.9.66.0 — 56 tools). VM lifecycle: hicloud_list_instances, hicloud_run_instances (image_id/instance_type/clone_instance_id, count 1-10, confirm), hicloud_start/stop/reboot/terminate_instances (confirm; terminate IRREVERSIBLE); VM completions: hicloud_modify_instance_attribute (up/downgrade), hicloud_restore_instance (snapshot); Images: hicloud_describe_images, hicloud_image_create/delete/modify; specs: hicloud_list_instance_types; CloudWatch: hicloud_get_instance_stats; Log: hicloud_log_list(start_date ISO 8601); EBS: hicloud_volume_create(instance_id, radix 1-20 = 100GB/unit)/attach/detach/delete/list; SLB: hicloud_slb_create (CaaS instanceIds+ports OR CVPC vpcBusinessServiceId+loadBalancerType+portsInfo/ripsInfo)/delete/list/vip_health/replace; Subnet: hicloud_subnet_create (CVPC vpcBusinessServiceId OR CaaS intranetGatewayBusinessServiceId)/delete/list/modify; Firewall: hicloud_acl_create (CaaS legacy '1;;1;;all;;accept;;any' OR CVPC subnet$/fqdn$/iprange$ strings)/delete/list/replace; VPC: hicloud_vpc_create/delete/list/modify; Internet: hicloud_igw_create/delete/list + hicloud_internet_ip_create/delete/list; Intranet: hicloud_intranet_gw_create/delete/list/modify + hicloud_intranet_link_create/delete/list; NAT: hicloud_nat_create/delete/list + hicloud_pfwd_create/delete/list. MOCK-FIRST SAFETY: HICLOUD_MODE=mock (the default) runs fully simulated in-memory resource books — NO HTTP call ever leaves the box (simulated=true). LIVE: requires HICLOUD_ACCESS_KEY + HICLOUD_SECRET_KEY (hicloud user portal / CloudBOSS entry). Lifecycle writes require TWO gates — per-call confirm=true (enforced even in mock) + HICLOUD_WRITES_ENABLED=on (master switch, default off). Signature = official 'Authentication of API Calling' algorithm (sorted params -> lowercase -> HMAC-SHA1 -> Base64 -> '+'->'*' '/'->'-' '='->removed), locked to the official doc example in tests. Docs: https://hws.hicloud.hinet.net/hws-doc/zh_TW/. NOTE: the in-process HicloudLocalHost is auto-registered for the qdrant-rag-agent Agent already — you only need this stdio server for external clients. Development/testing: keep HICLOUD_MODE=mock.",
+      "name": "hicloud",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.hicloud_server"],
+      "env": {
+        "HICLOUD_MODE": "${HICLOUD_MODE}",
+        "HICLOUD_WRITES_ENABLED": "${HICLOUD_WRITES_ENABLED}",
+        "HICLOUD_ACCESS_KEY": "${HICLOUD_ACCESS_KEY}",
+        "HICLOUD_SECRET_KEY": "${HICLOUD_SECRET_KEY}"
+      }
+    },
+    {
+      "_webhook": "Webhook trigger MCP (v0.9.25+). Event-driven prompt firing — each trigger carries its OWN URL (/trigger/<id>) + random access key; an HTTP call fires the pre-configured prompt through the agent (the event-driven counterpart to the scheduler). Tools: add_webhook_trigger(name, prompt, max_fires?, expires_at?) returns the per-trigger URL + access key (SHOWN ONLY ONCE), list_webhook_triggers, get_webhook_trigger, get_webhook_trigger_url(id, reveal?), delete/enable/disable_webhook_trigger, run_webhook_trigger_now(id, payload?), list_webhook_trigger_runs, get_webhook_trigger_errors. Lifecycle caps mirror schedules (max_fires=exhausted, expires_at=expired). NOTE: the in-process WebhookLocalHost is auto-registered for the qdrant-rag-agent Agent already; the HTTP LISTENER itself runs inside the app process on QDRANT_WEBHOOK_HOST:PORT (default 127.0.0.1:8335) — this stdio surface manages triggers for EXTERNAL clients only and does NOT bind the port.",
+      "name": "webhook",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.webhook_server"]
+    },
+    {
+      "_teams_assist": "Teams 桌面助理 MCP (v0.9.69+). Zero-Microsoft-permission Teams assistant — operates the user's OWN logged-in Teams DESKTOP client via the windows-mcp fleet (no Teams API / no OAuth). Tools (9): teams_assist_status / teams_assist_check (screenshot into the write sandbox for describe_image; mock mode never grabs the real screen) / teams_assist_start_watch (screen-hash watch daemon; fail-closed — TEAMS_ASSIST_ALLOW_CHATS must be non-empty) / teams_assist_stop_watch / teams_assist_reply (post-send registration + audit; write gate: AUTO off only records drafts) / teams_assist_pause / teams_assist_resume; v0.9.70+ adds teams_assist_send_uia (UI Automation background send — ValuePattern fill + InvokePattern 傳送, NO keyboard/mouse, no focus steal; yields when the compose box has content) and teams_assist_read_uia (TextPattern chat read, replaces screenshot OCR). NOTE: the AUTO-fire watch loop must run inside the Agent process — external stdio clients get the tools but the full assistant uses the in-process TeamsAssistLocalHost (auto-registered by McpManager.from_config). Env: QDRANT_TEAMS_ASSIST_MODE (mock default) / QDRANT_TEAMS_ASSIST_SEND_MODE (windows-mcp | uia) / QDRANT_TEAMS_ASSIST_AUTO / TEAMS_ASSIST_ALLOW_CHATS / TEAMS_MY_NAME / TEAMS_MY_ROLE / TEAMS_REPLY_STYLE — see .env.example.",
+      "name": "teams-assist",
+      "transport": "stdio",
+      "command": ["python", "-m", "src.mcp_server.teams_assist_server"],
+      "env": {
+        "QDRANT_TEAMS_ASSIST_MODE": "${QDRANT_TEAMS_ASSIST_MODE}",
+        "QDRANT_TEAMS_ASSIST_SEND_MODE": "${QDRANT_TEAMS_ASSIST_SEND_MODE}",
+        "QDRANT_TEAMS_ASSIST_AUTO": "${QDRANT_TEAMS_ASSIST_AUTO}",
+        "TEAMS_ASSIST_ALLOW_CHATS": "${TEAMS_ASSIST_ALLOW_CHATS}"
+      }
+    },
+    {
+      "_drawio_remote": "Official draw.io MCP server (remote, streamable_http). Provides create_diagram / edit_diagram / get_diagram to the LLM. TWO DIFFERENT SERVICES live under the draw.io brand: this MCP endpoint only GENERATES/edits diagram XML — the Drawio Viewer window in the GUI loads https://embed.diagrams.net (a separate service) and keeps working even when this server is unreachable. A connect failure is recorded in McpManager.failed and only costs these tools — the LLM can still write drawio XML itself and open it via open_content / write_file + open_file. Retry after a failure: restart the GUI or re-Save this file in the Admin tab fleet editor (triggers McpManager.replace_config, which reconnects).",
+      "name": "drawio",
+      "transport": "streamable_http",
+      "url": "https://mcp.draw.io/mcp",
+      "timeout": 30
+    }
+  ]
+}

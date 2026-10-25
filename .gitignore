@@ -1,0 +1,71 @@
+# secrets / live config — NEVER commit (live API keys + broker creds)
+.env
+.env.local
+.env.*.bak
+token.json
+*.key
+config/mcp.json
+google_oauth/
+
+# runtime logs (any)
+*.log
+*.log.*
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# local data / caches / sandboxes
+cache/
+qdrant_storage/
+node_modules/
+chat_offloads/
+documents/
+uploads/
+Temp/
+.cache/
+sandbox/
+
+# scratch / debug dumps
+hash*
+nul*
+tmp*.js
+tmp*.py
+# Android wrapper (android/) build outputs + the local SDK/keystore
+.android-sdk/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+android/.debug.keystore
+*.apk
+_tmp_fleet_grep.py
+configurator_add*.py
+_tmp_*.txt
+grep_agent.txt
+grep_error.txt
+grep_misc.txt
+grep_sched.txt
+grep_telegram.txt
+log_telegram.txt
+telegram_grep2.txt
+
+# personal docs at repo root (data, not code)
+科見*
+
+# binary doc artifacts (source of truth = the .md files)
+*.docx
+
+# editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# data snapshots & scratch never belong in a public repo
+backups/
+telegram_grep.txt

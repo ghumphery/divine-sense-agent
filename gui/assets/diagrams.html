@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drawio Viewer</title>
+  <link rel="stylesheet" href="diagrams.css" />
+  <!-- v0.9.5.3: we no longer load ``embed/v1.js``. The DrawioViewer
+       wrapper had undocumented internal property names that made
+       postMessage routing silently drop our XML, so the viewer
+       opened empty even after a successful chat-bridge click.
+       Instead, ``diagrams.js`` mounts a raw <iframe> with
+       ``?embed=1&proto=json&spin=1&ui=min`` and talks the JSON
+       protocol directly — same pattern as the official
+       ``jgraph/drawio-integration`` ``diagram-editor.js``. The
+       iframe element itself is created inside ``startDrawio()``;
+       we don't need any pre-loaded wrapper script here. -->
+</head>
+<body>
+  <header class="viewer-toolbar">
+    <span class="brand">📊 Drawio Viewer</span>
+    <button id="btn-save"     class="tb-btn primary">💾 Save back to sandbox</button>
+    <button id="btn-export"   class="tb-btn">⬇️ Export…</button>
+    <button id="btn-reload"   class="tb-btn" title="Reload current diagram from sandbox">🔄 Reload</button>
+    <button id="btn-print"    class="tb-btn">🖨️ Print</button>
+    <span class="grow"></span>
+    <span id="status-pill" class="status-pill" title="Python bridge liveness">📊 Drawio Viewer</span>
+    <span id="sandbox-path"  class="sandbox-path" title="Write sandbox root"></span>
+  </header>
+
+  <main id="editor-host" class="editor-host">
+    <!-- draw.io embed target. draw.io's embed.js will populate
+         this with its full editor UI once the iframe finishes
+         loading. -->
+    <div id="drawio-mount" class="drawio-mount"></div>
+
+    <!-- v0.9.5.4: loading overlay. drawio's full editor bundle
+         is ~9.6 MB of minified JS (app.min.js); on WebView2 it
+         boots much slower than in regular Edge/Chrome. Without
+         feedback the user sees only drawio's tiny "Loading…"
+         spinner and assumes the viewer is broken. This overlay
+         shows a live elapsed timer plus an escape-hatch button
+         ("在瀏覽器中開啟") once the load stalls.
+
+         v0.9.5.5: this overlay is now DEFAULT-VISIBLE (no
+         ``hidden`` attribute). Even if ``diagrams.js`` fails
+         to load entirely, the user sees a meaningful
+         "loading…" message instead of a blank white pane.
+         ``diagrams.js`` calls ``hideLoadingOverlay()`` once
+         drawio's ``init`` event arrives. The
+         ``<noscript>`` fallback inside covers the rare
+         environment where JS is fully disabled. -->
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="loading-card">
+        <div id="loading-spinner" class="loading-spinner"></div>
+        <h3 id="loading-title">⏳ 載入 drawio 編輯器…</h3>
+        <p id="loading-detail" class="loading-detail">
+          drawio 初次載入需要下載約 10 MB 的 JavaScript
+          (在 WebView2 中比較慢)。如果太久沒出現,
+          可以按下方按鈕在系統瀏覽器中開啟。
+        </p>
+        <p id="loading-timer" class="loading-timer">已等候 0 秒</p>
+        <!-- v0.9.5.5: anchor fallback is OUTSIDE the
+             stuck-actions hidden block so it stays visible
+             even if ``diagrams.js`` never executes. Plain
+             HTML <a target="_blank"> opens drawio in the
+             user's system browser via stdlib, no JS needed. -->
+        <div class="loading-actions">
+          <a id="link-open-in-browser" class="tb-btn primary"
+             href="https://embed.diagrams.net/?embed=1&proto=json&spin=1&ui=min"
+             target="_blank" rel="noopener noreferrer">
+            🌐 在瀏覽器中開啟 drawio
+          </a>
+        </div>
+        <!-- JS-only buttons, hidden until 15 s elapsed or
+             until reload is needed. These only appear when
+             ``diagrams.js`` has executed. -->
+        <div id="loading-stuck-actions" class="loading-actions" hidden>
+          <button id="btn-open-in-browser" class="tb-btn primary"
+                  type="button">
+            🌐 透過 Python 在瀏覽器中開啟
+          </button>
+          <button id="btn-reload-iframe" class="tb-btn" type="button">
+            🔄 重新載入 iframe
+          </button>
+        </div>
+        <noscript>
+          <p style="color:#b00020;font-weight:600;margin-top:12px;">
+            ⚠️ 此 viewer 需要 JavaScript 才能運作。<br>
+            請確認瀏覽器已啟用 JavaScript,或用上方連結在瀏覽器中直接開啟 drawio。
+          </p>
+        </noscript>
+      </div>
+    </div>
+
+    <!-- Drag-drop overlay: hidden by default; shown when the user
+         drags a .drawio file over the window. -->
+    <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
+      <div class="drop-card">
+        <div class="drop-icon">📂</div>
+        <div class="drop-text">Drop a .drawio file to load it</div>
+      </div>
+    </div>
+
+    <!-- Initial-state placeholder. Replaced by draw.io's iframe
+         on first "Init" message. -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">🎨</div>
+      <h2>Empty viewer</h2>
+      <p>Drop a <code>.drawio</code> file here, click
+         <em>Open from sandbox</em> below, or close this window
+         and use the chat / toolbar buttons in the main GUI to
+         open one.</p>
+      <button id="btn-open-sandbox" class="tb-btn big">
+        📂 Open from sandbox…
+      </button>
+    </div>
+  </main>
+
+  <footer class="viewer-footer">
+    <span class="hint">
+      Sandbox root: <code id="footer-sandbox">…</code>
+    </span>
+    <span class="hint">
+      Source: <code id="footer-source">none</code>
+    </span>
+  </footer>
+
+  <!-- Sandbox file picker (dialog). -->
+  <dialog id="sandbox-picker" class="sandbox-picker">
+    <form method="dialog" class="picker-form">
+      <h3>Open from sandbox</h3>
+      <p class="picker-help">
+        Files live in
+        <code id="picker-sandbox">…</code>.
+        Type a path relative to that root (e.g.
+        <code>diagrams/hello.drawio</code>).
+      </p>
+      <input id="picker-input" type="text"
+             placeholder="relative/path/file.drawio" />
+      <menu>
+        <button value="cancel">Cancel</button>
+        <button id="picker-load" value="load">Load</button>
+      </menu>
+      <p id="picker-error" class="picker-error" hidden></p>
+    </form>
+  </dialog>
+
+  <!-- Save dialog (filename + overwrite toggle). -->
+  <dialog id="save-dialog" class="save-dialog">
+    <form method="dialog" class="save-form">
+      <h3>Save diagram</h3>
+      <p class="picker-help">
+        Saved into the write sandbox. Default extension:
+        <code>.drawio</code>.
+      </p>
+      <label>Filename
+        <input id="save-filename" type="text"
+               placeholder="my-diagram.drawio" />
+      </label>
+      <label class="checkbox">
+        <input id="save-overwrite" type="checkbox" checked />
+        Overwrite if file exists
+      </label>
+      <menu>
+        <button value="cancel">Cancel</button>
+        <button id="save-confirm" value="save">Save</button>
+      </menu>
+      <p id="save-error" class="picker-error" hidden></p>
+    </form>
+  </dialog>
+
+  <script src="diagrams.js"></script>
+</body>
+</html>

@@ -1,0 +1,322 @@
+/* v0.9.5+ drawio viewer styles. Mirrors the dark-ish toolbar
+   palette of the main GUI (see gui/assets/style.css) but
+   scoped to the standalone viewer window so opening N
+   viewers never collides with main-window selectors. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #1e1e23;
+  color: #e7e9ee;
+  overflow: hidden;
+}
+
+.viewer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #2a2b30;
+  border-bottom: 1px solid #14141a;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.brand {
+  font-weight: 600;
+  font-size: 14px;
+  margin-right: 12px;
+  color: #f0f3f8;
+}
+
+.tb-btn {
+  background: #383a42;
+  border: 1px solid #4a4d57;
+  color: #e7e9ee;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s ease;
+  /* v0.9.5.5: ``.tb-btn`` is now also applied to <a>
+     elements (the loading-overlay's "open in browser"
+     fallback link). Strip the browser-default underline +
+     blue so anchors visually match buttons. */
+  text-decoration: none;
+  display: inline-block;
+  font-family: inherit;
+}
+.tb-btn:hover  { background: #44474f; }
+.tb-btn:active { background: #2f3136; }
+.tb-btn.primary {
+  background: #2962ff;
+  border-color: #1e4ec0;
+}
+.tb-btn.primary:hover  { background: #3877ff; }
+.tb-btn.primary:active { background: #2050d6; }
+.tb-btn.big { padding: 10px 18px; font-size: 14px; }
+
+.grow { flex: 1 1 auto; }
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: #383a42;
+  border: 1px solid #4a4d57;
+}
+.status-pill.ok    { background: #1e4a2c; color: #c8f0d2; }
+.status-pill.err   { background: #5a1e1e; color: #f5c8c8; }
+
+.sandbox-path {
+  font-size: 11px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: #8b8e98;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;     /* show the *end* of long paths */
+}
+
+.editor-host {
+  position: relative;
+  flex: 1 1 auto;
+  height: calc(100% - 48px - 28px);  /* toolbar + footer */
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.drawio-mount {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Empty state — shown until first diagram is loaded */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f4f5f8;
+  color: #4b4f5a;
+  text-align: center;
+  padding: 20px;
+  z-index: 1;
+}
+.empty-state.hidden { display: none; }
+.empty-icon { font-size: 56px; margin-bottom: 12px; }
+.empty-state h2 { margin: 0 0 8px; font-size: 20px; }
+.empty-state p {
+  margin: 0 0 16px;
+  max-width: 380px;
+  line-height: 1.5;
+}
+.empty-state code,
+.picker-help code,
+.viewer-footer code {
+  background: #e3e6ec;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Drag-drop overlay */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(41, 98, 255, 0.18);
+  border: 4px dashed #2962ff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.drop-overlay.active { display: flex; }
+.drop-card {
+  background: white;
+  color: #2a2b30;
+  padding: 28px 36px;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+.drop-icon { font-size: 48px; }
+.drop-text { margin-top: 8px; font-size: 16px; font-weight: 500; }
+
+/* v0.9.5.4: drawio loading overlay (sits on top of the
+   iframe until drawio's ``{event: 'init'}`` arrives). The
+   overlay is full-area, dimmed, with a centred card. Once
+   init arrives we hide the entire overlay (display:none) so
+   it doesn't intercept clicks. */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 245, 248, 0.92);
+  z-index: 10;
+  pointer-events: auto;
+}
+.loading-overlay[hidden] { display: none; }
+.loading-card {
+  background: #ffffff;
+  color: #2a2b30;
+  padding: 28px 36px;
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  max-width: 460px;
+  border: 1px solid #d8dce5;
+}
+.loading-card h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.loading-detail {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #4b4f5a;
+  line-height: 1.5;
+}
+.loading-timer {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: #8b8e98;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+.loading-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.loading-actions[hidden] { display: none; }
+/* Pure CSS spinner — no external deps. */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 14px;
+  border: 4px solid #e3e6ec;
+  border-top-color: #2962ff;
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Footer */
+.viewer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  height: 28px;
+  background: #14141a;
+  border-top: 1px solid #0a0a0e;
+  font-size: 11px;
+  color: #8b8e98;
+  flex-shrink: 0;
+}
+.hint code { background: #2a2b30; color: #d0d4dc; }
+
+/* Sandbox picker dialog */
+dialog {
+  border: 0;
+  border-radius: 10px;
+  padding: 0;
+  background: #ffffff;
+  color: #2a2b30;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  min-width: 460px;
+  max-width: 560px;
+}
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+.picker-form, .save-form {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.picker-form h3, .save-form h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.picker-help {
+  margin: 0;
+  font-size: 12px;
+  color: #6c707a;
+  line-height: 1.4;
+}
+.picker-form input[type="text"],
+.save-form input[type="text"] {
+  padding: 8px 10px;
+  border: 1px solid #c8ccd6;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+.picker-form input[type="text"]:focus,
+.save-form input[type="text"]:focus {
+  outline: 2px solid #2962ff;
+  outline-offset: -1px;
+}
+.picker-form menu,
+.save-form menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.picker-form menu button,
+.save-form menu button {
+  padding: 7px 16px;
+  border: 1px solid #c8ccd6;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #2a2b30;
+  cursor: pointer;
+  font-size: 13px;
+}
+.picker-form menu button[value="load"],
+.save-form menu button[value="save"] {
+  background: #2962ff;
+  border-color: #1e4ec0;
+  color: white;
+}
+.picker-form menu button[value="load"]:hover,
+.save-form menu button[value="save"]:hover {
+  background: #3877ff;
+}
+.save-form label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.picker-error {
+  margin: 0;
+  font-size: 12px;
+  color: #b00020;
+  background: #fde6e8;
+  padding: 6px 10px;
+  border-radius: 4px;
+}

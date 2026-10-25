@@ -1,0 +1,25 @@
+{
+  "_comment": "20-question retrieval benchmark for embedding-model comparison (Qwen3-8B vs 4B vs EmbeddingGemma-2). expect = acceptable source filenames in top-5. Run per collection: python eval/eval_driver.py <collection> <dim>",
+  "questions": [
+    {"q": "MA5/20 組合在 2330 回測的夏普排名是多少？", "expect": ["backtest_2330_report.md"]},
+    {"q": "為什麼回測策略樣本外表現反而比訓練期更好？", "expect": ["backtest_2330_report.md"]},
+    {"q": "Gate 原則是按什麼設閘？不可逆轉的操作怎麼處理？", "expect": ["claude_code_loops_and_graphs.md"]},
+    {"q": "Cloudflare 開源的安全審計 skill 名稱是什麼，分成幾個階段？", "expect": ["cloudflare_audit_skill.md"]},
+    {"q": "FinRL-X 的定位與目標用戶是誰？", "expect": ["finrl_deepdive.md"]},
+    {"q": "Bespoke Nimble 用了什麼技術組合？", "expect": ["jev_tweets_digest.md"]},
+    {"q": "edgejev 在 CPU 上單題推論要多少毫秒？", "expect": ["jev_tweets_digest.md"]},
+    {"q": "ml4trading 第三版的 Part 3 模型開發涵蓋哪些章節主題？", "expect": ["ml4trading_3e_notes.md"]},
+    {"q": "MuseAI 唯一支援的通訊頻道是什麼？", "expect": ["museai_deepdive.md"]},
+    {"q": "從其他 AI 助手匯入 context 時如何防止注入攻擊？", "expect": ["museai_deepdive.md"]},
+    {"q": "NautilusTrader 對 2330 KPI 排程回測數字來源不明問題的根治方案是什麼？", "expect": ["nautilus_trader_deepdive.md"]},
+    {"q": "OpenMuse 瀏覽器 worker 的網路邊界只允許哪些連接？", "expect": ["openmuse_deepdive.md"]},
+    {"q": "Telegram 發送訊息後必須做什麼回報驗證？", "expect": ["project_improvement_plan.md"]},
+    {"q": "排程產出驗證的三種做法中，機械式檢查為何被列為優先？", "expect": ["project_improvement_plan_v2.md"]},
+    {"q": "P2 能力擴展包含哪三個項目？", "expect": ["project_improvement_plan_v3.md"]},
+    {"q": "「小樣本是妄想溫床」一節對 10 筆交易樣本怎麼說？", "expect": ["quant_guide_trading_randomness.md"]},
+    {"q": "SSRN 論文中 55 SMA 與 EMA 的公式在第幾頁？", "expect": ["ssrn_id3453295_code2224789.pdf"]},
+    {"q": "Jev 的三個誠實提醒包括哪些內容？", "expect": ["taiwan_stock_jev_architecture.md"]},
+    {"q": "xquant 書的第 6 章「別高興太早」主要在防止什麼？", "expect": ["xquant_book_notes.md"]},
+    {"q": "drawio 檢視器的 _wrapForDrawio 會把裸 mxGraphModel 包成什麼結構？", "expect": ["20261007-105810-ARCHITECTURE.md", "20261007-105810-README.md"]}
+  ]
+}

@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant-rag
+    ports:
+      - "6333:6333"   # HTTP API
+      - "6334:6334"   # gRPC API
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+    # NOTE: Vulkan GPU acceleration is automatic when running natively on
+    # Linux/macOS (HNSW uses SIMD intrinsics). In Docker on Windows host,
+    # Qdrant falls back to scalar HNSW; still much faster than Milvus Lite
+    # because Qdrant is a proper server (no file-locking, true parallelism).
+
+volumes:
+  qdrant_storage:

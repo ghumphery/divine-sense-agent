@@ -1,0 +1,1 @@
+# v0.9.125.9 — the WebView wrapper keeps everything; nothing to strip.

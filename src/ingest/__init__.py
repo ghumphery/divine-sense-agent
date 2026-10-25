@@ -1,0 +1,1 @@
+"""ingest package — pipeline, loader, chunker, embedder, image_describer."""
