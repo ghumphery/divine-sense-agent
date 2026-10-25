@@ -4834,11 +4834,11 @@ header 🖌️ 按鈕開啟「🎨 外觀設定」對話框（全前端、localS
 ### v0.9.88.3 — keep-auth scope 模式（invalid_scope 診斷 + fallback；live consent 回 `Error 400: invalid_scope`）
 
 * **根因**：Google 拒絕 consent 的 scope 組合 — client
-  `1042148281919`（AI Studio 自建專案 `gen-lang-client-0153475874`）上
+  `1042148281919`（AI Studio 自建專案 `<YOUR_GOOGLE_CLOUD_PROJECT_ID>`）上
   **Google Keep API 未啟用**，或**個人帳戶不支援 Keep API**（官方 Keep
   API 以企業環境為主）。兩者都會在 consent 頁直接回 invalid_scope。
 * **修復路徑**：到
-  `https://console.cloud.google.com/apis/library/keep.googleapis.com?project=gen-lang-client-0153475874`
+  `https://console.cloud.google.com/apis/library/keep.googleapis.com`
   啟用 Google Keep API → 重跑 `python cli.py keep-auth`。
 * **`keep-auth --scopes {combined,calendar,keep}`**（新參數）：
   * `combined`（預設）— keep+calendar 一次同意（原行為）；
